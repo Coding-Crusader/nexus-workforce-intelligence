@@ -1377,19 +1377,20 @@ elif st.session_state.current_step == 5:
                                   (col_t3, "INTERVENTION C", "PATH C: Data Engineering")]:
             s = sim_map.get(code)
             if s:
-                gain = s["future_reachable_count"] - s["baseline_reachable_count"]
+                gain = len(s["newly_unlocked_roles"])
+                kpi_val = s['future_reachable_count'] if s['future_reachable_count'] > 0 else len(s['newly_unlocked_roles'])
                 with col:
                     st.markdown(f"""
                     <div class="kpi-container" style="border-top: 4px solid #0284c7;">
                         <div class="kpi-title">{label}</div>
-                        <div class="kpi-value">{s['future_reachable_count']}</div>
-                        <div class="kpi-subtext">+{gain} new roles (+{s['opportunity_expansion_pct']:.0f}%)</div>
+                        <div class="kpi-value">{kpi_val}</div>
+                        <div class="kpi-subtext">+{gain} new role{'s' if gain != 1 else ''} (+{s['opportunity_expansion_pct']:.0f}%)</div>
                         <div style="font-size: 0.8rem; color: #0284c7; margin-top: 8px;">Salary Lift: <strong>+₹{s['salary_growth_lakhs']:.2f}L</strong></div>
                     </div>
                     """, unsafe_allow_html=True)
 
         # Highlight optimal pathway
-        best_sim = max(all_sim_results, key=lambda x: (x["opportunity_expansion_pct"], x["salary_growth_lakhs"]))
+        best_sim = max(all_sim_results, key=lambda x: (x["opportunity_expansion_pct"], x["salary_growth_lakhs"], x["vacancy_growth"]))
         best_inv = best_sim["intervention"]
         best_name = best_inv.get("short_name", best_inv.get("name", "Winning Path"))
         newly_unlocked = best_sim["newly_unlocked_roles"]

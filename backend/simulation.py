@@ -61,15 +61,23 @@ class TransitionSimulator:
                 "boost": round(new_val - current_val, 3)
             }
 
+        # Applied project experience from intervention capstone:
+        # Completing an intensive 10-12 week curriculum with an end-to-end capstone project
+        # provides verified project implementation, elevating freshers/students towards entry-level readiness
+        effective_future_exp = max(experience_years, 0.75) if experience_years < 1.0 else experience_years
+
         # 3. Future landscape
-        future_landscape = self.engine.evaluate_candidate_landscape(future_capabilities, experience_years)
+        future_landscape = self.engine.evaluate_candidate_landscape(future_capabilities, effective_future_exp)
         future_roles_df = future_landscape["roles_table"].set_index("role_name")
         future_reachable = set(future_landscape["reachable_roles"])
+        future_stretch = set(future_landscape.get("stretch_roles", []))
         future_vacancies = future_landscape["reachable_vacancies"]
         future_avg_salary = future_landscape["average_reachable_salary"]
 
         # 4. Comparative Metrics
-        newly_unlocked_roles = sorted(list(future_reachable - baseline_reachable))
+        newly_reachable = sorted(list(future_reachable - baseline_reachable))
+        baseline_stretch = set(baseline_landscape.get("stretch_roles", []))
+        newly_stretch = sorted(list((future_stretch - baseline_stretch) - baseline_reachable))
         retained_reachable_roles = sorted(list(future_reachable.intersection(baseline_reachable)))
         remaining_blocked_roles = sorted(list(set(future_landscape["blocked_roles"])))
         remaining_stretch_roles = sorted(list(set(future_landscape["stretch_roles"])))
@@ -77,16 +85,36 @@ class TransitionSimulator:
         n_before = len(baseline_reachable)
         n_after = len(future_reachable)
 
-        # Opportunity Expansion = (reachable_after - reachable_before) / reachable_before
+        # Opportunity Expansion & Unlocked Roles Calculation
         if n_before > 0:
             opportunity_expansion_ratio = (n_after - n_before) / n_before
             opportunity_expansion_pct = round(opportunity_expansion_ratio * 100.0, 1)
+            vacancy_growth = future_vacancies - baseline_vacancies
+            salary_growth_lakhs = round(future_avg_salary - baseline_avg_salary, 2)
+            newly_unlocked_roles = newly_reachable
         else:
-            opportunity_expansion_ratio = 1.0 if n_after > 0 else 0.0
-            opportunity_expansion_pct = 100.0 if n_after > 0 else 0.0
-
-        vacancy_growth = future_vacancies - baseline_vacancies
-        salary_growth_lakhs = round(future_avg_salary - baseline_avg_salary, 2)
+            # Cold-start / Fresher candidate with 0 baseline reachable roles
+            if n_after > 0:
+                opportunity_expansion_pct = round(n_after * 100.0, 1)
+                opportunity_expansion_ratio = float(n_after)
+                vacancy_growth = future_vacancies
+                salary_growth_lakhs = round(future_avg_salary, 2)
+                newly_unlocked_roles = newly_reachable
+            elif newly_stretch:
+                # Interventions unlocking near-reachable / stretch entry career tracks
+                unlocked_vacancies = sum(int(future_roles_df.loc[r, "market_vacancies"]) for r in newly_stretch)
+                unlocked_sal = float(np.mean([future_roles_df.loc[r, "average_salary_lakhs"] for r in newly_stretch]))
+                opportunity_expansion_pct = round(len(newly_stretch) * 100.0, 1)
+                opportunity_expansion_ratio = float(len(newly_stretch))
+                vacancy_growth = unlocked_vacancies
+                salary_growth_lakhs = round(unlocked_sal, 2)
+                newly_unlocked_roles = newly_stretch
+            else:
+                opportunity_expansion_ratio = 0.0
+                opportunity_expansion_pct = 0.0
+                vacancy_growth = 0
+                salary_growth_lakhs = 0.0
+                newly_unlocked_roles = []
 
         # Per-role transition comparison table
         comparison_records = []
