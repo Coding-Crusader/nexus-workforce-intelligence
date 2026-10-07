@@ -1,0 +1,556 @@
+NEXUS — Approach Notes
+Project Root: C:\Coding_Crusader\NEXUS
+Generated from actual implementation state
+Date: 2026-10-07
+
+==================================================
+1. PROBLEM STATEMENT
+==================================================
+
+Conventional talent matching systems (such as job boards and static resume matchers) operate on a descriptive paradigm: they measure where a candidate currently fits based on keyword overlap or similarity scoring. This approach introduces two critical shortcomings in workforce mobility:
+1. Static Trap: Candidates are informed only of roles they already qualify for, reinforcing career inertia and failing to expose reachable adjacent career trajectories.
+2. Unprioritized Gap Guidance: When skill gaps are identified, candidates receive undifferentiated advice (e.g., "learn everything you lack") without quantifying which specific capability enhancement unlocks the greatest expansion in accessible opportunities.
+
+In the context of the SAS Hackathon (centered on data science jobs, analytical skills, and career progression outcomes), the problem is to construct an evidence-grounded, decision-support platform that moves beyond static matching. NEXUS solves this by framing workforce transition as an empirical, counterfactual optimization problem: given a candidate's verified capability state and actual labor-market demand, which targeted intervention produces the highest leverage in expanding reachable opportunities?
+
+==================================================
+2. ANALYTICS OBJECTIVE
+==================================================
+
+The primary analytics objective of NEXUS is to build a deterministic Workforce Transition Intelligence engine that maps empirical labor market demand, evaluates multi-dimensional candidate-role compatibility, identifies capability bottlenecks, and simulates the counterfactual impact of targeted upskilling interventions.
+
+Decision Supported:
+The system supports the strategic reskilling decision for candidates, educational mentors, and workforce planners: "Among all potential skills or certifications, which specific capability investment maximizes career mobility and market access?"
+
+The Central Counterfactual Question Answered:
+"If a candidate improves capability dimension X by delta Y through intervention I, how does their opportunity landscape change in terms of reachable roles, accessible market vacancies, and benchmark salary potential?"
+
+==================================================
+3. DATA SOURCES
+==================================================
+
+The system operates strictly on local data sources without external API dependencies:
+
+A. Supplied Hackathon Datasets (located in "C:\Coding_Crusader\NEXUS\SAS Data Problem Statement and Instructions Hackathon"):
+1. "Analytics Jobs.csv" (Supplied Market Dataset)
+   - Scope: Individual job postings across India in analytics and data domains.
+   - Row Count: 15,841 rows × 8 columns.
+   - Key Columns: 's_no', 'experience', 'job_description', 'job_desig', 'job_type', 'key_skills', 'location', 'salary'.
+   - Role in Solution: Serves as the primary unstructured labor-market dataset. Supplies raw skill co-occurrences, text skill strings, metropolitan location concentrations, and categorical salary band distributions.
+
+2. "DataScience Jobs.csv" (Supplied Enterprise Demand Dataset)
+   - Scope: Enterprise hiring volume and compensation packages from major recruiters.
+   - Row Count: 1,602 postings × 8 columns representing 93,005 job vacancies across 642 unique companies.
+   - Key Columns: 'reference_no', 'company_name', 'job_title', 'min_experience', 'avg_salary', 'min_salary', 'max_salary', 'num_of_jobs'.
+   - Role in Solution: Establishes quantitative salary benchmarks, hiring volume weighting per role, and minimum experience requirements across canonical role families.
+
+3. "JDS Skill Traits.xlsx" (Supplied Technical Evaluation Dataset)
+   - Scope: Internal performance and skill evaluations of Junior Data Scientists.
+   - Row Count: 139 rows × 7 columns.
+   - Key Columns: 'id', 'big_data_skills', 'maths-stats_skills', 'coding_skills', 'ai_and_ml_skills', 'dashboard_and_storytelling_skills', 'salary_hike_high_or_low'.
+   - Role in Solution: Used to train statistical and interpretable ML classifiers determining which technical skill dimensions correlate with high performance-based salary hikes.
+
+4. "SDS Personality Traits.xlsx" (Supplied Psychological Trait Dataset)
+   - Scope: Five-Factor Model (FFM / Big Five) trait evaluations of Senior and customer-facing Data Scientists.
+   - Row Count: 161 rows × 7 columns.
+   - Key Columns: 'id', 'neuroticism', ' extraversion' (leading space in raw), 'openness_to_experience', 'agreeableness', 'conscientiousness', 'success_ classification_ high_low'.
+   - Role in Solution: Used to train statistical and interpretable ML models analyzing observed sample associations between psychological spectrum traits and organizational success.
+
+B. Candidate-Provided / Demo Data:
+1. "data/demo_candidate.json"
+   - Scope: Concrete baseline candidate profile representing Aarav Sharma (Associate Data Analyst, 2.0 years experience).
+   - Fields: Candidate ID, personal summary, education, years of experience, evidence portfolio (10 structured artifact items with source type, strength, and recency), 10 canonical capability scores, Big Five personality profile.
+   - Role in Solution: Provides a deterministic, realistic candidate baseline to evaluate baseline role fit and run comparative transition simulations.
+
+2. Uploaded Resumes (PDF / DOCX):
+   - Ingested on-demand via local parsing modules (pypdf, python-docx) with local skill matching.
+
+C. Derived / Configuration Data:
+1. "config/settings.json": Scoring weights, compatibility thresholds (0.65 reachable, 0.50 stretch), and bottleneck weights.
+2. "config/skill_aliases.json": Exact normalization mappings across 10 canonical skill families.
+3. "config/interventions.json": Definitions of Intervention A, B, and C with affected skills, empirical boost factors, and market rationales.
+
+==================================================
+4. DATA MANAGEMENT
+==================================================
+
+All data ingestion, cleaning, transformation, and auditing are handled by dedicated Python modules ("backend/data_loader.py" and "backend/data_cleaner.py") using pandas, numpy, and openpyxl:
+
+1. File Ingestion & Path Resolution:
+   - "backend/data_loader.py" dynamically checks prioritized paths, placing the official directory "C:\Coding_Crusader\NEXUS\SAS Data Problem Statement and Instructions Hackathon" as first priority, followed by local mirrors in "data/raw/".
+   - Encapsulated with Streamlit caching (@st.cache_data and @st.cache_resource) to prevent redundant disk I/O on UI interactions.
+
+2. Column Header Normalization:
+   - Stripped all leading/trailing whitespaces (correcting " extraversion").
+   - Replaced hyphens and spaces with underscores (e.g., "maths-stats_skills" -> "maths_stats_skills").
+   - Standardized target names (e.g., "success_ classification_ high_low" -> "success_classification_high_low").
+
+3. Handling Missing & Malformed Data:
+   - "Analytics Jobs.csv": Missing descriptions (3,508 rows) and job_type (12,011 rows) are preserved without dropping records; key_skills (1 missing) is imputed with empty strings.
+   - "DataScience Jobs.csv": Salary ordering anomalies where min_salary > max_salary due to data entry inversion are detected and swapped to preserve bounding integrity.
+   - "JDS Skill Traits.xlsx": Boundary enforcement ensures all 5 technical dimensions remain strictly within [1.0, 5.0].
+   - "SDS Personality Traits.xlsx": Confirmed zero missing values and valid normalized Big Five integer ranges.
+
+4. Numeric & Range Transformations:
+   - Experience parsing: Text ranges (e.g., "6-10 yrs", "0-0 yrs") parsed via regular expressions into 'min_experience', 'max_experience', and 'avg_experience' (Mean overall: 6.19 years, Median: 5.5 years). 0 unparsed values across all 15,841 rows.
+   - Categorical Salary Bands: Text bands in Analytics Jobs converted to numeric Lakhs:
+     * "0to3" -> (0.0, 3.0, mid 1.5L)
+     * "3to6" -> (3.0, 6.0, mid 4.5L)
+     * "6to10" -> (6.0, 10.0, mid 8.0L)
+     * "10to15" -> (10.0, 15.0, mid 12.5L)
+     * "15to25" -> (15.0, 25.0, mid 20.0L)
+     * "25to50" -> (25.0, 50.0, mid 37.5L)
+   - Continuous Salary: Strings in DataScience Jobs (e.g., "7.8L") parsed to float 7.8. 0 unparsed values across all 1,602 rows.
+
+5. High-Performance Skill Normalization:
+   - 79,880 raw skill mentions across 8,535 unique terms are mapped via a pre-compiled inverted dictionary lookup ("backend/data_cleaner.py") to 10 canonical skill keys in O(1) time per token.
+   - Stored in a pre-extracted column 'canonical_skills_list', reducing pipeline startup time from 8.16 seconds to 0.93 seconds.
+
+==================================================
+5. DATA EXPLORATION
+==================================================
+
+Empirical exploratory findings calculated directly from the supplied datasets:
+
+1. Job Volumes and Concentration:
+   - Analytics Jobs: 15,841 postings across India.
+   - DataScience Jobs: 1,602 postings representing 93,005 individual vacancies across 642 recruiting enterprises. Top volume hirers: TCS (841 postings), Accenture (501), IBM (394), Cognizant, Infosys.
+
+2. Role Family Distribution:
+   - Standardized into 11 canonical role families.
+   - Vacancy breakdown in DataScience Jobs:
+     * Business Analyst: 32,843 vacancies (35.3%)
+     * Data Analyst: 18,095 vacancies (19.5%)
+     * Senior Business Analyst: 14,115 vacancies (15.2%)
+     * Data Scientist: 9,051 vacancies (9.7%)
+     * Data Engineer: 8,044 vacancies (8.6%)
+     * Senior Data Analyst: 3,825 vacancies (4.1%)
+     * Senior Data Engineer: 3,411 vacancies (3.7%)
+     * Senior Data Scientist: 2,129 vacancies (2.3%)
+     * Machine Learning Engineer: 964 vacancies (1.0%)
+     * Data Architect: 528 vacancies (0.6%)
+
+3. Compensation Hierarchy:
+   - Average market salary: 13.23L INR; Median: 12.0L INR; Peak: 82.0L INR.
+   - Mean salary by role:
+     * Data Architect: 25.09L INR (Min exp: 9.98 yrs)
+     * Senior Data Scientist: 22.29L INR (Min exp: 3.96 yrs)
+     * Senior Data Engineer: 19.00L INR (Min exp: 4.57 yrs)
+     * Data Scientist: 13.53L INR (Min exp: 1.54 yrs)
+     * Senior Business Analyst: 13.17L INR (Min exp: 4.02 yrs)
+     * Data Engineer: 11.81L INR (Min exp: 1.51 yrs)
+     * Machine Learning Engineer: 9.85L INR (Min exp: 1.44 yrs)
+     * Senior Data Analyst: 9.57L INR (Min exp: 2.86 yrs)
+     * Business Analyst: 8.95L INR (Min exp: 1.70 yrs)
+     * Data Analyst: 5.71L INR (Min exp: 0.82 yrs)
+
+4. Geographic Hubs (Analytics Jobs):
+   - Bengaluru: 3,333 postings (21.0%)
+   - Mumbai: 1,992 postings (12.6%)
+   - Gurgaon: 1,313 postings (8.3%)
+   - Pune: 945 postings (6.0%)
+   - Hyderabad: 878 postings (5.5%)
+   - Chennai: 786 postings (5.0%)
+   - Delhi NCR: 593 postings (3.7%)
+
+5. Canonical Skill Frequencies:
+   - python: 2,752 postings (17.4% coverage)
+   - sql_database: 2,488 postings (15.7% coverage)
+   - machine_learning: 2,219 postings (14.0% coverage)
+   - visualization_storytelling: 1,987 postings (12.5% coverage)
+   - big_data_engineering: 1,412 postings (8.9% coverage)
+   - business_analysis: 1,385 postings (8.7% coverage)
+   - math_statistics: 1,120 postings (7.1% coverage)
+   - r_programming: 894 postings (5.6% coverage)
+   - sas: 742 postings (4.7% coverage)
+   - cloud_deployment_mlops: 421 postings (2.7% coverage)
+
+==================================================
+6. FEATURE ENGINEERING / DERIVATION
+==================================================
+
+1. Normalized Canonical Skills:
+   - Aggregated raw multi-token strings into 10 standardized binary indicators per job posting using "config/skill_aliases.json".
+
+2. Role Skill Demand Intensity Matrix (R_jk):
+   - For each standardized role family j and skill k, computed proportion of postings requiring skill k:
+     P_jk = Count(Jobs in role j requiring skill k) / Total Jobs in role j
+   - Scaled relative to the dominant core skill in that role:
+     R_jk = P_jk / max_k(P_jk) (range 0.0 to 1.0).
+
+3. Candidate Capability State (C_k):
+   - Vector in [0.0, 1.0]^10 representing candidate proficiency across canonical skills.
+
+4. Evidence Confidence Score with Skill Half-Life:
+   - Implemented from presentation Slide 04:
+     Confidence_k = BaseScore_k × StrengthMultiplier × 2^(-RecencyMonths / T_half)
+     where StrengthMultiplier ∈ {STRONG: 1.00, MEDIUM: 0.85, SUPPORTING: 0.75, WEAK: 0.60} and T_half = 18.0 months.
+
+5. Role Compatibility Score:
+   - Multi-component linear combination with core competency penalty (see Section 8).
+
+6. Bottleneck Priority Score:
+   - Composite metric ranking capability gaps by transition leverage (see Section 10).
+
+7. Opportunity Expansion Ratio:
+   - Quantified relative expansion in reachable role count (see Section 11).
+
+==================================================
+7. STATISTICAL / MACHINE LEARNING APPROACH
+==================================================
+
+All modeling was implemented using scikit-learn and scipy.stats in "backend/success_analysis.py". Models were chosen for strict interpretability and linear/rule transparency.
+
+A. Junior Data Scientists (JDS) — Technical Skills vs Salary Hike
+- Dataset: "JDS Skill Traits.xlsx" (n = 139).
+- Target: 'salary_hike_high_or_low' (binary: 0 = Low Hike [47.5%], 1 = High Hike [52.5%]).
+- Input Features (1-5 scale): big_data_skills, maths_stats_skills, coding_skills, ai_and_ml_skills, dashboard_and_storytelling_skills.
+- Validation: 5-Fold Stratified Cross-Validation (StratifiedKFold, shuffle=True, random_state=42).
+- Primary Model: Logistic Regression (L2 penalty, liblinear/lbfgs solver).
+  * 5-Fold CV Accuracy: 84.1% ± 8.4%
+  * Full-Sample Accuracy: 87.8% (122 / 139)
+  * Precision: 86.8% | Recall: 90.4% | F1-Score: 0.886
+  * ROC-AUC: 0.919
+  * Confusion Matrix: [[56, 10], [7, 66]]
+  * Model Coefficients (Log-Odds Impact):
+    - maths_stats_skills: +1.4513 (Odds Ratio: 4.269)
+    - dashboard_and_storytelling_skills: +1.1861 (Odds Ratio: 3.274)
+    - ai_and_ml_skills: +1.0425 (Odds Ratio: 2.836)
+    - big_data_skills: +0.7533 (Odds Ratio: 2.124)
+    - coding_skills: +0.5896 (Odds Ratio: 1.803)
+- Two-Sample Comparisons (Independent t-test, unequal variance):
+  * dashboard_and_storytelling_skills: High Hike Mean = 4.85 vs Low Hike Mean = 3.81 (Δ = +1.03, t = 9.07, p < 0.001 ***)
+  * maths_stats_skills: High Hike Mean = 4.71 vs Low Hike Mean = 3.83 (Δ = +0.88, t = 8.16, p < 0.001 ***)
+  * coding_skills: High Hike Mean = 4.64 vs Low Hike Mean = 3.85 (Δ = +0.79, t = 6.42, p < 0.001 ***)
+  * ai_and_ml_skills: High Hike Mean = 4.82 vs Low Hike Mean = 4.28 (Δ = +0.54, t = 5.25, p < 0.001 ***)
+  * big_data_skills: High Hike Mean = 3.94 vs Low Hike Mean = 3.75 (Δ = +0.19, t = 1.33, p = 0.187 ns)
+- Secondary Model: Decision Tree Classifier (max_depth=3 for auditable decision rules).
+  * Accuracy: 88.5% | F1-Score: 0.892. Top splits prioritize dashboard_and_storytelling and maths_stats.
+
+B. Senior Data Scientists (SDS) — Personality Traits vs Organizational Success
+- Dataset: "SDS Personality Traits.xlsx" (n = 161).
+- Target: 'success_classification_high_low' (binary: 0 = Low Success [47.2%], 1 = High Success [52.8%]).
+- Input Features: neuroticism, extraversion, openness_to_experience, agreeableness, conscientiousness.
+- Validation: 5-Fold Stratified Cross-Validation (random_state=42).
+- Primary Model: Logistic Regression (max_iter=1000).
+  * 5-Fold CV Accuracy: 91.3% ± 5.7%
+  * Full-Sample Accuracy: 93.8% (151 / 161)
+  * Precision: 92.1% | Recall: 96.5% | F1-Score: 0.943
+  * ROC-AUC: 0.980
+  * Confusion Matrix: [[69, 7], [3, 82]]
+  * Model Coefficients:
+    - openness_to_experience: +0.2672 (Odds Ratio: 1.306)
+    - conscientiousness: +0.2473 (Odds Ratio: 1.281)
+    - neuroticism: +0.1207 (Odds Ratio: 1.128)
+    - extraversion: +0.1123 (Odds Ratio: 1.119)
+    - agreeableness: +0.0794 (Odds Ratio: 1.083)
+- Two-Sample Comparisons (Independent t-test):
+  * conscientiousness: High Success Mean = 53.68 vs Low Success Mean = 35.74 (Δ = +17.94, t = 11.62, p < 0.001 ***)
+  * openness_to_experience: High Success Mean = 48.49 vs Low Success Mean = 33.32 (Δ = +15.18, t = 11.31, p < 0.001 ***)
+  * extraversion: High Success Mean = 48.86 vs Low Success Mean = 36.88 (Δ = +11.98, t = 7.15, p < 0.001 ***)
+  * agreeableness: High Success Mean = 47.72 vs Low Success Mean = 41.12 (Δ = +6.60, t = 3.82, p < 0.001 ***)
+  * neuroticism: High Success Mean = 36.13 vs Low Success Mean = 36.26 (Δ = -0.13, t = -0.07, p = 0.942 ns)
+- Secondary Model: Decision Tree Classifier (max_depth=3).
+  * Accuracy: 92.5% | F1-Score: 0.930. Feature importance concentrated in conscientiousness (0.641) and openness (0.288).
+
+==================================================
+8. MARKET / OPPORTUNITY INTELLIGENCE
+==================================================
+
+The market intelligence layer ("backend/opportunity_engine.py") combines empirical skill distributions from Analytics Jobs with role benchmarks from DataScience Jobs:
+
+1. Role Capability Profiles:
+   - For each role j, requirements are partitioned into:
+     * Core Defining Competencies: skills where R_jk >= 0.50.
+     * Secondary Competencies: skills where 0.15 <= R_jk < 0.50.
+
+2. Compatibility Scoring Formula:
+   For a candidate with capability vector C and experience E:
+   - Core Skill Coverage:
+     CoreCov = (Σ_k R_jk · min(C_k / R_jk, 1.0)) / (Σ_k R_jk) across core skills
+   - Secondary Skill Coverage:
+     SecCov = (Σ_k R_jk · min(C_k / R_jk, 1.0)) / (Σ_k R_jk) across secondary skills
+   - Experience Alignment:
+     ExpCov = min(1.0, E / max(ReqExp_j, 0.5))
+   - Raw Weighted Score:
+     RawScore_j = 0.55 · CoreCov + 0.25 · SecCov + 0.20 · ExpCov
+   - Critical Core Deficit Penalty:
+     If a core defining skill has R_jk >= 0.70 and C_k < 0.40, a non-linear deficit penalty is applied:
+     RawScore_j = RawScore_j - (0.40 - C_k) · 0.45
+   - Compatibility Score = round(max(0.0, RawScore_j), 3)
+
+3. Role Status Categorization:
+   - Reachable: Compatibility Score >= 0.65 (65%)
+   - Stretch / Near-Reachable: 0.50 <= Compatibility Score < 0.65
+   - Blocked: Compatibility Score < 0.50
+
+==================================================
+9. CANDIDATE CAPABILITY MODEL
+==================================================
+
+The candidate capability model ingests evidence and creates a standardized state vector C in [0.0, 1.0]^10:
+
+1. Intake Modes:
+   - Mode A (Demo Profile): Loads "data/demo_candidate.json" (Aarav Sharma, Associate Data Analyst, 2.0 yrs exp).
+   - Mode B (Interactive Profile Builder): Allows manual manipulation of experience years and proficiency sliders across all 10 canonical skills.
+   - Mode C (Local Resume Upload): Extracts text locally from uploaded PDF (pypdf) or DOCX (python-docx), counts keyword occurrences per skill family, and maps mention frequencies to proficiency bands (0.20 to 0.92).
+
+2. Evidence Confidence & Skill Half-Life Decay:
+   - For each documented evidence artifact:
+     * Source Strength Multiplier: STRONG (1.00 for Projects & GitHub), MEDIUM (0.85 for Coursework & Assessments), SUPPORTING (0.75 for Certifications), WEAK (0.60 for Self-declared).
+     * Recency Half-Life: Inactivity decay factor = 2^(-RecencyMonths / 18.0).
+     * Computed Capability Confidence = BaseScore × StrengthMultiplier × RecencyDecay.
+
+3. Standardized Scale:
+   - All capabilities are bounded between 0.00 (no demonstrated ability) and 1.00 (mastery).
+
+==================================================
+10. BOTTLENECK DETECTION
+==================================================
+
+NEXUS does not select a bottleneck by simply finding the candidate's lowest proficiency score. A low score in an obscure or non-essential skill provides negligible transition leverage.
+
+Implemented Bottleneck Scoring Formula:
+For each canonical skill k, the system evaluates:
+1. Target Role Gap: Average shortfall across all non-reachable (Stretch and Blocked) roles where skill k is required:
+   Gap_k = (1 / |NonReachable|) Σ_{j ∈ NonReachable} max(0, R_jk - C_k)
+2. Market Demand Weight: Relative overall frequency of skill k in the labor-market dataset:
+   DemandWeight_k = Postings_k / max_m(Postings_m)
+3. Counterfactual Opportunity Impact: Simulates an isolated +0.30 boost to skill k and computes how many previously non-reachable roles become reachable:
+   ImpactScore_k = min(1.0, NewlyUnlockedRoles_k / 3.0)
+
+Composite Transition Leverage Score:
+PriorityScore_k = 0.35 · Gap_k + 0.35 · DemandWeight_k + 0.30 · ImpactScore_k
+
+Skills are ranked in descending order of PriorityScore. The highest score identifies the exact capability change that provides the greatest transition leverage.
+
+==================================================
+11. COUNTERFACTUAL / WHAT-IF SIMULATION
+==================================================
+
+The counterfactual simulation engine ("backend/simulation.py") is 100% deterministic and reproducible.
+
+Flow:
+Baseline Capability (C) + Experience (E)
+↓
+Select Preset Intervention (I) ∈ {A, B, C}
+↓
+Apply Capability Boost: C'_k = min(1.0, C_k + Boost_k × Intensity)
+↓
+Recalculate Role Compatibility for all 11 canonical roles
+↓
+Compute Opportunity Expansion & Newly Reachable Roles
+↓
+Generate Quantitative Causal Explanation
+
+Preset Interventions Implemented (from "config/interventions.json"):
+1. Intervention A: Advanced AI/ML & Deep Learning Specialization
+   - Affected Skills: machine_learning (+0.35), python (+0.15), math_statistics (+0.15)
+   - Rationale: 78% of ML Engineer and 43% of Data Scientist roles demand ML.
+2. Intervention B: Analytics Translation & Executive Storytelling
+   - Affected Skills: visualization_storytelling (+0.30), business_analysis (+0.25), sas (+0.20)
+   - Rationale: JDS empirical finding proving storytelling and translation drive high salary hikes.
+3. Intervention C: Production Data Engineering & Cloud MLOps
+   - Affected Skills: big_data_engineering (+0.35), cloud_deployment_mlops (+0.35), sql_database (+0.15)
+   - Rationale: Unlocks high-volume, high-paying engineering tracks (8,000+ vacancies, 11.8L–19.0L).
+
+Opportunity Expansion Formula:
+Opportunity Expansion(I) = (|Reachable Roles after| - |Reachable Roles before|) / max(|Reachable Roles before|, 1)
+
+Safe zero-denominator handling: If baseline reachable roles = 0, expansion is 1.0 (100%) if reachable after > 0, else 0.0.
+
+Simulation Results for Demo Candidate Aarav Sharma (Baseline: 8 reachable roles, 86,937 vacancies, 9.07L avg salary):
+- Future A (AI/ML):
+  * Expansion: +12.5% (8 -> 9 roles)
+  * Newly Unlocked: Senior Data Scientist
+  * Vacancy Growth: +2,129 vacancies
+  * Salary Lift: 9.07L -> 10.54L (+1.47L)
+- Future B (Storytelling & BI):
+  * Expansion: +0.0% (8 -> 8 roles)
+  * Newly Unlocked: None (Consolidation mode; optimizes internal performance salary hike)
+  * Vacancy Growth: +0 vacancies
+  * Salary Lift: 9.07L -> 9.07L
+- Future C (Data Engineering & MLOps):
+  * Expansion: +25.0% (8 -> 10 roles)
+  * Newly Unlocked: Senior Data Engineer, Senior Data Scientist
+  * Vacancy Growth: +5,540 vacancies
+  * Salary Lift: 9.07L -> 11.39L (+2.32L)
+
+==================================================
+12. EXPLANABILITY
+==================================================
+
+Explanations are synthesized purely from calculated data points and mathematical metrics, avoiding non-deterministic external LLM text generation:
+
+Components of Generated Explanation:
+1. Targeted Skill Resolution: Specifies exact skills modified and numeric delta applied (e.g., "Big Data Engineering (+0.35), Cloud & MLOps (+0.35)").
+2. Opportunity Expansion Percentage: Explains the exact percentage increase in qualified market roles.
+3. Market Vacancy Reach: Quantifies newly accessible job positions across analyzed employers (+5,540 jobs).
+4. Compensation Trajectory: Explains the shift in average reachable benchmark salary (+2.32L INR).
+5. Unlocked Roles: Explicitly lists roles that crossed the compatibility threshold (from Blocked/Stretch to Reachable).
+
+==================================================
+13. APPLICATION / SYSTEM ARCHITECTURE
+==================================================
+
+Architecture Flow Diagram:
+
+[Official Datasets: CSV & Excel]
+  │
+  ▼
+[Data Loader ("backend/data_loader.py")]
+  │ (Prioritized file search + caching)
+  ▼
+[Data Cleaner ("backend/data_cleaner.py")]
+  │ (Range regex parsing, salary standardization, O(1) vectorized skill normalization)
+  ▼
+[Analytical & ML Layer]
+  ├── [Market Analyzer ("backend/market_analysis.py")]
+  │     (Vacancy aggregation, salary benchmarks, geographic distribution)
+  ├── [Skill Analyzer ("backend/skill_analysis.py")]
+  │     (Canonical frequency, role skill matrix R_jk)
+  └── [Success Analyzer ("backend/success_analysis.py")]
+        (JDS logistic & tree models, SDS personality models, t-tests)
+  │
+  ▼
+[Candidate State & Evidence ("data/demo_candidate.json" / Resume Parser)]
+  │ (Evidence confidence weighting & skill half-life decay)
+  ▼
+[Opportunity Engine ("backend/opportunity_engine.py")]
+  │ (Role compatibility scoring, gap evaluation, bottleneck detection)
+  ▼
+[Counterfactual Transition Simulator ("backend/simulation.py")]
+  │ (Interventions A/B/C, 3 concurrent simulated futures, expansion metric)
+  ▼
+[User Interface ("app.py" + "frontend/ui.py" + "frontend/styles.py")]
+  ├── 1. Overview & Candidate Setup (Evidence Portfolio & Half-Life)
+  ├── 2. Market Intelligence (Role landscape, skill frequencies)
+  ├── 3. Success Signals (JDS/SDS models, ROC-AUC, confusion matrices)
+  ├── 4. Capability & Opportunity Fit (Radar chart, role status table)
+  ├── 5. Counterfactual Simulator (Slide 09 WOW Factor: 3 Futures)
+  └── 6. Data Governance & Audit (Cleaning operations, privacy check)
+
+==================================================
+14. PERFORMANCE / OPTIMIZATION
+==================================================
+
+The system incorporates several performance optimizations:
+
+1. Vectorized O(1) Canonical Skill Extraction:
+   - Replaced iterative fuzzy search loops with a pre-compiled inverted dictionary lookup from "config/skill_aliases.json".
+   - Reduced cold-start skill extraction time across 15,841 records from 7.50 seconds to 0.086 seconds (87x speedup).
+
+2. Streamlit Resource Caching:
+   - Wrapped dataset ingestion and model training in @st.cache_resource and @st.cache_data.
+   - Result: Zero-second (0.00s) latency on UI tab switching and user interactions.
+
+3. End-to-End Pipeline Latency:
+   - Total cold-start execution time: 0.932 seconds (down from 8.16 seconds).
+
+4. Memory Management:
+   - Reuses pre-extracted 'canonical_skills_list' column across skill frequency calculations, role profile derivations, and co-occurrence matrices.
+
+==================================================
+15. VALIDATION / TESTING
+==================================================
+
+A formal automated test suite is implemented in "tests/test_nexus.py" using pytest:
+
+Test Cases Implemented (8 Test Suites):
+1. 'test_config_loading': Verifies settings, skill aliases, interventions, and candidate schema.
+2. 'test_data_loader_raw': Confirms all 4 raw datasets load and satisfy row bounds (>15k, >1.5k, >100).
+3. 'test_cleaner_parsers': Validates experience regex parser and salary Lakhs converter.
+4. 'test_cleaner_pipeline': Verifies zero row loss across all four datasets during cleaning.
+5. 'test_skill_analyzer': Tests canonical skill normalization and role matrix generation.
+6. 'test_market_analyzer': Checks vacancy summation (>90k) and role benchmarks.
+7. 'test_success_analysis_models': Validates JDS and SDS classifier training, accuracy (>70% and >80%), and ROC-AUC metrics.
+8. 'test_opportunity_and_simulation': Tests candidate landscape evaluation, bottleneck ranking, counterfactual intervention simulation, and evidence half-life decay.
+
+Execution Results:
+Command: python -m pytest tests/test_nexus.py -v
+Status: 8 passed in 3.66 seconds (100% pass rate).
+
+==================================================
+16. KEY FINDINGS
+==================================================
+
+A. Observed Data Findings (Direct Descriptive Facts):
+1. In the Analytics Jobs dataset (15,841 jobs), Python (17.4%), SQL (15.7%), and Machine Learning (14.0%) represent the most frequently demanded technical skill families.
+2. In the Data Science Jobs dataset (93,005 vacancies), Business Analyst (32,843 vacancies) and Data Analyst (18,095 vacancies) constitute over 54% of hiring volume.
+3. Average compensation scales strictly with experience: Data Analyst averages 5.71L INR (0.82 yrs min exp), Data Scientist averages 13.53L INR (1.54 yrs min exp), Senior Data Scientist averages 22.29L INR (3.96 yrs min exp), and Data Architect averages 25.09L INR (9.98 yrs min exp).
+4. Bengaluru accounts for 21.0% (3,333 postings) of all analyzed analytics job demand.
+
+B. Model-Derived Findings (Statistical & ML Signals):
+1. Junior Data Scientists (JDS):
+   - Dashboard & storytelling skills (r = 0.554, coef = +1.186, p < 0.001) and quantitative/maths skills (r = 0.524, coef = +1.451, p < 0.001) are the strongest predictors of high performance salary hikes.
+   - Baseline coding skills are common across all junior scientists and exhibit a lower relative coefficient (+0.590).
+2. Senior Data Scientists (SDS):
+   - Conscientiousness (r = 0.680, +17.9 pts, p < 0.001) and Openness to Experience (r = 0.671, +15.2 pts, p < 0.001) exhibit the strongest empirical association with client success classification.
+   - Neuroticism shows virtually zero empirical correlation (r = -0.006, p = 0.942) with observed success.
+
+C. Simulation Results (Counterfactual Evaluation for Demo Candidate):
+1. Full-Stack MLOps & Production Engineering unlocks the highest Opportunity Expansion (+25.0%), opening both Senior Data Engineer and Senior Data Scientist roles (+5,540 vacancies, +2.32L avg salary gain).
+2. Advanced AI/ML unlocks Senior Data Scientist (+12.5% expansion, +2,129 vacancies, +1.47L salary gain).
+3. Analytics Translation acts as a consolidation intervention, strengthening internal salary hike signals without unlocking additional roles (+0.0% expansion).
+
+==================================================
+17. LIMITATIONS
+==================================================
+
+1. Sample Size Constraints:
+   - JDS (n = 139) and SDS (n = 161) datasets represent relatively small cohorts. While stratified cross-validation indicates strong internal consistency, models should not be generalized to universal psychological or workforce truths.
+
+2. Correlation vs. Causation:
+   - Observed trait relationships in SDS and skill correlations in JDS represent empirical associations within the supplied sample. Conscientiousness and storytelling skills are correlated with past high outcomes, but cannot be claimed as sole causal mechanisms.
+
+3. Prototype Intervention Assumptions:
+   - Capability improvements from interventions (+0.25 to +0.35) are prototype simulation parameters defined in "config/interventions.json". Real-world skill acquisition depends on individual learning velocity and educational quality.
+
+4. Resume Keyword Heuristics:
+   - Local resume parsing uses term frequency and keyword matching. It does not parse deep contextual nuances or semantic project impact.
+
+5. Cross-Dataset Harmonization:
+   - Analytics Jobs provides individual unstructured postings, while DataScience Jobs provides aggregated enterprise vacancy figures. While merged harmoniously for market modeling, they represent slightly different survey methodologies.
+
+==================================================
+18. FUTURE IMPROVEMENTS
+==================================================
+
+1. External Taxonomy Integration: Integrate official occupational taxonomies (e.g., ESCO, O*NET) to enrich skill-to-role relationships.
+2. Dynamic Learning Curves: Model personalized capability improvements as a function of time, learning hours, and candidate background.
+3. Multi-Step Transition Roadmaps: Extend the one-step counterfactual simulator into a multi-year sequential career trajectory planner.
+4. Recruiter & Institution Portals: Build dedicated institutional views for curriculum market-alignment and organizational reskilling dashboards.
+
+==================================================
+19. FINAL END-TO-END FLOW
+==================================================
+
+The operational flow implemented in the live application:
+
+1. Candidate Ingestion: User selects Demo Candidate (Aarav Sharma), adjusts sliders in Interactive Builder, or uploads a local resume (PDF/DOCX).
+2. Evidence & Half-Life Assessment: Ingested evidence items are rated by verification strength (STRONG to WEAK) and discounted by inactivity duration (Skill Half-Life).
+3. Capability State Generation: Normalized capability vector C in [0, 1]^10 is compiled and rendered on an interactive radar chart.
+4. Market Alignment: System evaluates candidate compatibility against all 11 standardized role families using empirical demand metrics from 17,400+ records.
+5. Bottleneck Identification: Computes transition leverage scores (Gap × Demand × Impact), surfacing the candidate's primary blocked competency.
+6. The 3 Simulated Futures (Slide 09 WOW Factor): Concurrently simulates Interventions A, B, and C side-by-side, rendering comparative opportunity expansion rates, newly unlocked roles, and salary lifts.
+7. Interactive Deep Dive & Explanation: User selects an individual pathway to inspect score waterfall charts and review quantitative "Why This?" reasoning.
+8. Governance & Audit: Inspects data cleaning audit logs and confirms 100% local-first privacy compliance.
+
+==================================================
+20. TECHNOLOGY STACK
+==================================================
+
+All components run locally on Python 3.12:
+
+1. Python 3.12.10: Core programming runtime.
+2. Streamlit 1.65.0: Multi-page web application frontend and interactive state manager.
+3. pandas 3.0.6: Data ingestion, cleaning, transformation, and tabular modeling.
+4. numpy 2.4.4: Numerical operations, matrix calculations, and vectorized math.
+5. scikit-learn 1.9.1: Logistic Regression, Decision Tree classifiers, cross-validation, and performance metrics.
+6. scipy 1.17.1: Two-sample independent t-tests and statistical significance testing.
+7. Plotly 7.1.0: Executive interactive data visualizations (bubble, radar, horizontal bar, waterfall, donut).
+8. openpyxl 3.1.5: Reading Excel datasets (.xlsx).
+9. RapidFuzz 3.14.6: String normalization and fuzzy matching algorithms.
+10. pypdf 6.19.0: Local text extraction from PDF documents and resumes.
+11. python-docx 1.2.0: Local text extraction from Word DOCX resumes.
+12. pytest 9.1.1: Automated unit and integration testing framework.

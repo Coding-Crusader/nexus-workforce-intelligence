@@ -1,0 +1,51 @@
+problem_name,language,topic,difficulty,result,date,attempts
+Two Sum,Python,Arrays,Easy,Accepted,2026-09-28,1
+Trapping Rain Water,C++,Dynamic Programming,Hard,Accepted,2026-09-27,2
+Merge Intervals,Python,Arrays,Medium,Accepted,2026-09-26,1
+LRU Cache,C++,Data Structures,Medium,Accepted,2026-09-25,1
+Binary Tree Maximum Path Sum,C++,Trees,Hard,Accepted,2026-09-24,3
+Subarray Sum Equals K,Python,Hash Table,Medium,Accepted,2026-09-22,1
+Word Break II,C++,Dynamic Programming,Hard,Accepted,2026-09-20,2
+Course Schedule,C++,Graphs,Medium,Accepted,2026-09-18,1
+Median of Two Sorted Arrays,C++,Binary Search,Hard,Accepted,2026-09-15,4
+Longest Increasing Subsequence,C++,Dynamic Programming,Medium,Accepted,2026-09-14,1
+Kth Largest Element in an Array,Python,Heap,Medium,Accepted,2026-09-12,1
+Coin Change,C++,Dynamic Programming,Medium,Accepted,2026-09-10,1
+Valid Parentheses,Python,Stack,Easy,Accepted,2026-09-08,1
+Number of Islands,Python,Graphs,Medium,Accepted,2026-09-05,1
+Alien Dictionary,C++,Graphs,Hard,Accepted,2026-09-02,2
+Product of Array Except Self,Python,Arrays,Medium,Accepted,2026-08-30,1
+Climbing Stairs,C++,Dynamic Programming,Easy,Accepted,2026-08-28,1
+Edit Distance,C++,Dynamic Programming,Hard,Accepted,2026-08-25,2
+Top K Frequent Elements,Python,Heap,Medium,Accepted,2026-08-22,1
+Implement Trie Prefix Tree,C++,Trie,Medium,Accepted,2026-08-20,1
+Department Top Three Salaries,SQL,Database,Hard,Accepted,2026-08-18,1
+Rank Scores,SQL,Database,Medium,Accepted,2026-08-15,1
+Consecutive Numbers,SQL,Database,Medium,Accepted,2026-08-12,1
+Second Highest Salary,SQL,Database,Easy,Accepted,2026-08-10,1
+Nth Highest Salary,SQL,Database,Medium,Accepted,2026-08-08,1
+Trips and Users,SQL,Database,Hard,Accepted,2026-08-05,2
+Human Traffic of Stadium,SQL,Database,Hard,Accepted,2026-08-01,1
+Customers Who Never Order,SQL,Database,Easy,Accepted,2026-07-28,1
+Delete Duplicate Emails,SQL,Database,Easy,Accepted,2026-07-25,1
+Rising Temperature,SQL,Database,Easy,Accepted,2026-07-20,1
+House Robber III,C++,Trees,Medium,Accepted,2026-07-15,1
+Serialize and Deserialize Binary Tree,C++,Trees,Hard,Accepted,2026-07-10,3
+Word Ladder,Python,Graphs,Hard,Accepted,2026-07-05,2
+Lowest Common Ancestor,Python,Trees,Medium,Accepted,2026-06-30,1
+Longest Palindromic Substring,C++,Dynamic Programming,Medium,Accepted,2026-06-25,1
+Pacific Atlantic Water Flow,Python,Graphs,Medium,Accepted,2026-06-20,1
+Rotting Oranges,Python,Graphs,Medium,Accepted,2026-06-15,1
+Maximum Subarray,C++,Arrays,Medium,Accepted,2026-06-10,1
+Best Time to Buy and Sell Stock with Cooldown,C++,Dynamic Programming,Medium,Accepted,2026-06-05,1
+Sliding Window Maximum,C++,Queue,Hard,Accepted,2026-05-30,2
+Reconstruct Itinerary,Python,Graphs,Hard,Accepted,2026-05-25,2
+Search in Rotated Sorted Array,Python,Binary Search,Medium,Accepted,2026-05-20,1
+Graph Valid Tree,C++,Graphs,Medium,Accepted,2026-05-15,1
+Meeting Rooms II,Python,Heap,Medium,Accepted,2026-05-10,1
+Decode Ways,C++,Dynamic Programming,Medium,Accepted,2026-05-05,1
+Find Minimum in Rotated Sorted Array,Python,Binary Search,Medium,Accepted,2026-04-30,1
+Combination Sum,Python,Backtracking,Medium,Accepted,2026-04-25,1
+Permutations,Python,Backtracking,Medium,Accepted,2026-04-20,1
+Subsets,Python,Backtracking,Medium,Accepted,2026-04-15,1
+Letter Combinations of a Phone Number,Python,Backtracking,Medium,Accepted,2026-04-10,1

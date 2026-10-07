@@ -1,0 +1,38 @@
+{
+  "system_name": "NEXUS Workforce Transition Intelligence",
+  "version": "1.0.0",
+  "opportunity_engine": {
+    "compatibility_threshold": 0.65,
+    "stretch_threshold": 0.50,
+    "blocked_threshold": 0.40,
+    "scoring_weights": {
+      "core_skill_match": 0.55,
+      "secondary_skill_match": 0.25,
+      "experience_alignment": 0.20
+    },
+    "bottleneck_weighting": {
+      "gap_weight": 0.35,
+      "market_demand_weight": 0.35,
+      "opportunity_impact_weight": 0.30
+    }
+  },
+  "simulation": {
+    "default_intervention_boost": 0.25,
+    "max_capability_level": 1.0,
+    "min_capability_level": 0.0
+  },
+  "data_paths": {
+    "raw_dir": "data/raw",
+    "processed_dir": "data/processed",
+    "analytics_jobs": "data/raw/Analytics Jobs.csv",
+    "datascience_jobs": "data/raw/DataScience Jobs.csv",
+    "jds_skills": "data/raw/JDS Skill Traits.xlsx",
+    "sds_personality": "data/raw/SDS Personality Traits.xlsx",
+    "demo_candidate": "data/demo_candidate.json"
+  },
+  "ui_settings": {
+    "page_title": "NEXUS | Workforce Transition Intelligence",
+    "theme": "corporate_slate",
+    "default_page": "Overview"
+  }
+}

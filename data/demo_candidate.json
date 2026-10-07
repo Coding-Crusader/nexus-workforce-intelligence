@@ -1,0 +1,121 @@
+{
+  "candidate_id": "CAND-2026-NEXUS-01",
+  "name": "Aarav Sharma",
+  "current_title": "Associate Data Analyst",
+  "target_ambition": "Data Scientist / Machine Learning Specialist",
+  "years_of_experience": 2.0,
+  "education": "B.Tech in Computer Science / Information Technology",
+  "summary": "Data analyst with 2 years of experience handling SQL reporting, exploratory data analysis with Python, and executive dashboards. Eager to transition into predictive modeling and senior data science tracks.",
+  "evidence_portfolio": [
+    {
+      "skill_key": "python",
+      "skill_name": "Python",
+      "source_type": "Projects & GitHub",
+      "evidence_description": "Built automated data ingestion pipelines and ETL scripts using pandas & numpy in production repository.",
+      "evidence_strength": "STRONG",
+      "recency_months": 2,
+      "base_score": 0.85
+    },
+    {
+      "skill_key": "sql_database",
+      "skill_name": "SQL & Databases",
+      "source_type": "Projects & Assessments",
+      "evidence_description": "Architected PostgreSQL analytical marts, complex window functions, and query optimization. Assessment Score: 94%.",
+      "evidence_strength": "STRONG",
+      "recency_months": 1,
+      "base_score": 0.88
+    },
+    {
+      "skill_key": "visualization_storytelling",
+      "skill_name": "Visualization & Storytelling",
+      "source_type": "Projects & Coursework",
+      "evidence_description": "Designed executive monthly reporting dashboards in Power BI and conducted executive stakeholder presentations.",
+      "evidence_strength": "STRONG",
+      "recency_months": 3,
+      "base_score": 0.78
+    },
+    {
+      "skill_key": "math_statistics",
+      "skill_name": "Math & Statistics",
+      "source_type": "Coursework & Assessment",
+      "evidence_description": "University coursework in Probability, Statistical Inference, and Hypothesis Testing (Grade A).",
+      "evidence_strength": "MEDIUM",
+      "recency_months": 8,
+      "base_score": 0.72
+    },
+    {
+      "skill_key": "business_analysis",
+      "skill_name": "Business Analysis",
+      "source_type": "Projects",
+      "evidence_description": "Managed sprint requirement gathering, user stories, and UAT validation for business reporting.",
+      "evidence_strength": "MEDIUM",
+      "recency_months": 4,
+      "base_score": 0.65
+    },
+    {
+      "skill_key": "machine_learning",
+      "skill_name": "Machine Learning",
+      "source_type": "Coursework & Self-declared",
+      "evidence_description": "Academic course in introductory Machine Learning with basic scikit-learn models; limited recent production practice.",
+      "evidence_strength": "WEAK",
+      "recency_months": 14,
+      "base_score": 0.50
+    },
+    {
+      "skill_key": "big_data_engineering",
+      "skill_name": "Big Data Engineering",
+      "source_type": "Coursework",
+      "evidence_description": "Basic Hadoop & MapReduce lab coursework during undergraduate studies.",
+      "evidence_strength": "WEAK",
+      "recency_months": 20,
+      "base_score": 0.35
+    },
+    {
+      "skill_key": "cloud_deployment_mlops",
+      "skill_name": "Cloud & MLOps",
+      "source_type": "Self-declared",
+      "evidence_description": "Self-study reading on Docker and AWS basics without verified project artifact.",
+      "evidence_strength": "WEAK",
+      "recency_months": 22,
+      "base_score": 0.30
+    },
+    {
+      "skill_key": "sas",
+      "skill_name": "SAS Analytics",
+      "source_type": "Coursework & Training",
+      "evidence_description": "Introductory SAS programming seminar and basic DATA step procedures.",
+      "evidence_strength": "SUPPORTING",
+      "recency_months": 16,
+      "base_score": 0.45
+    },
+    {
+      "skill_key": "r_programming",
+      "skill_name": "R Programming",
+      "source_type": "Coursework",
+      "evidence_description": "College lab exercises in R for statistical modeling and ggplot2 visualization.",
+      "evidence_strength": "SUPPORTING",
+      "recency_months": 18,
+      "base_score": 0.48
+    }
+  ],
+  "capabilities": {
+    "python": 0.82,
+    "sql_database": 0.86,
+    "visualization_storytelling": 0.74,
+    "business_analysis": 0.62,
+    "math_statistics": 0.66,
+    "machine_learning": 0.38,
+    "big_data_engineering": 0.22,
+    "cloud_deployment_mlops": 0.20,
+    "sas": 0.34,
+    "r_programming": 0.36
+  },
+  "preferred_locations": ["Bengaluru", "Pune", "Hyderabad", "Remote"],
+  "personality_profile": {
+    "neuroticism": 35,
+    "extraversion": 62,
+    "openness_to_experience": 68,
+    "agreeableness": 65,
+    "conscientiousness": 72
+  }
+}

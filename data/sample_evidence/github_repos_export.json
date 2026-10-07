@@ -1,0 +1,34 @@
+[
+  {
+    "name": "churn-prediction-system",
+    "language": "Python",
+    "description": "Production machine learning pipeline for customer churn forecasting with XGBoost and scikit-learn",
+    "topics": ["machine-learning", "python", "scikit-learn", "data-science"],
+    "stargazers_count": 14,
+    "updated_at": "2026-09-20"
+  },
+  {
+    "name": "competitive-cpp-solutions",
+    "language": "C++",
+    "description": "Clean, optimized C++ implementations of high-level algorithmic problems and tree/graph dynamic programming",
+    "topics": ["algorithms", "data-structures", "c-plus-plus", "competitive-programming"],
+    "stargazers_count": 28,
+    "updated_at": "2026-09-25"
+  },
+  {
+    "name": "analytics-warehouse-etl",
+    "language": "SQL",
+    "description": "Enterprise star-schema data modeling, aggregation views, and automated SQL ETL pipelines",
+    "topics": ["sql", "database", "etl", "data-warehouse", "analytics"],
+    "stargazers_count": 8,
+    "updated_at": "2026-08-15"
+  },
+  {
+    "name": "model-serving-fastapi-docker",
+    "language": "Dockerfile",
+    "description": "Containerized FastAPI microservice with automated GitHub Actions CI/CD and model health monitoring",
+    "topics": ["mlops", "docker", "fastapi", "ci-cd"],
+    "stargazers_count": 19,
+    "updated_at": "2026-09-10"
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "int_a_aiml",
+    "preset_code": "INTERVENTION A",
+    "name": "Intervention A: Advanced AI/ML & Deep Learning Specialization",
+    "short_name": "Intervention A (AI/ML)",
+    "category": "Machine Learning & AI",
+    "description": "Intensive hands-on curriculum covering statistical learning, scikit-learn predictive pipelines, PyTorch deep neural networks, and modern NLP workflows.",
+    "skills_affected": {
+      "machine_learning": 0.35,
+      "python": 0.15,
+      "math_statistics": 0.15
+    },
+    "default_improvement": 0.25,
+    "rationale": "Empirical labor market analysis shows 78% of ML Engineer and 43% of Data Scientist job postings require machine learning competence. Elevating ML capability unlocks high-tier predictive modeling roles.",
+    "target_roles_unlocked": ["Data Scientist", "Machine Learning Engineer", "Senior Data Scientist"]
+  },
+  {
+    "id": "int_b_storytelling",
+    "preset_code": "INTERVENTION B",
+    "name": "Intervention B: Analytics Translation & Executive Storytelling",
+    "short_name": "Intervention B (Storytelling & BI)",
+    "category": "Analytics & Storytelling",
+    "description": "Executive dashboard architecture (Power BI / Tableau), KPI synthesis, business problem translation, and data storytelling for decision-makers.",
+    "skills_affected": {
+      "visualization_storytelling": 0.30,
+      "business_analysis": 0.25,
+      "sas": 0.20
+    },
+    "default_improvement": 0.25,
+    "rationale": "Empirical evidence from the Junior Data Scientist (JDS) cohort proves dashboard and storytelling capability has the highest observed correlation (r=0.554, beta=1.186) with performance-based salary hikes.",
+    "target_roles_unlocked": ["Business Analyst", "Senior Data Analyst", "Senior Business Analyst"]
+  },
+  {
+    "id": "int_c_data_engineering",
+    "preset_code": "INTERVENTION C",
+    "name": "Intervention C: Production Data Engineering & Cloud MLOps",
+    "short_name": "Intervention C (Data Engineering & MLOps)",
+    "category": "Production & Infrastructure",
+    "description": "Distributed data computing (Spark, Hadoop, Hive), scalable data warehouse modeling, Docker containerization, cloud data services, and MLOps deployment pipelines.",
+    "skills_affected": {
+      "big_data_engineering": 0.35,
+      "cloud_deployment_mlops": 0.35,
+      "sql_database": 0.15
+    },
+    "default_improvement": 0.25,
+    "rationale": "Data Engineering roles command an average salary of 11.8L and Senior Data Engineer 19.0L, representing over 8,000 market vacancies. Overcoming the Spark/Cloud barrier opens lucrative engineering career tracks.",
+    "target_roles_unlocked": ["Data Engineer", "Senior Data Engineer", "Data Architect"]
+  }
+]
