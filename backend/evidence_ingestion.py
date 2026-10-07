@@ -30,18 +30,24 @@ class ResumeConnector:
         cand_name = extracted.get("name", "Candidate")
         exp_years = extracted.get("years_of_experience", 2.0)
 
+        skill_counts = extracted.get("raw_mention_counts", {})
         skill_events = []
         for skill_key, score in caps.items():
-            if score >= 0.20:
+            cnt = skill_counts.get(skill_key, 0)
+            if cnt > 0 and score > 0.25:
                 skill_events.append({
                     "skill": skill_key,
-                    "topic": "Resume Project & Experience Documentation",
+                    "topic": f"Resume Documentation ({cnt} mention{'s' if cnt != 1 else ''})",
                     "score": round(score, 3),
-                    "difficulty": "MEDIUM",
-                    "volume": 1,
+                    "difficulty": "HARD" if cnt >= 5 else ("MEDIUM" if cnt >= 2 else "EASY"),
+                    "volume": cnt,
                     "recency": 2.0,
-                    "metadata": {"source_doc": filename}
+                    "metadata": {"source_doc": filename, "mentions": cnt}
                 })
+
+        # Slide 04: Unverified resume text claims without live repository verification are SUPPORTING/WEAK
+        verif_strength = "MEDIUM" if exp_years >= 3.0 else ("SUPPORTING" if exp_years >= 1.0 else "WEAK")
+        base_score = 0.80 if exp_years >= 3.0 else 0.70
 
         return {
             "source_type": "RESUME",
@@ -49,10 +55,10 @@ class ResumeConnector:
             "candidate_name": cand_name,
             "experience_years": exp_years,
             "evidence_type": "RESUME_VERIFICATION",
-            "title": f"Verified Resume Portfolio: {filename}",
-            "description": f"Extracted professional experience, projects, and technologies from {filename}.",
-            "verification_strength": "STRONG" if exp_years >= 2.0 else "MEDIUM",
-            "base_score": 0.85,
+            "title": f"Resume Documentation: {filename}",
+            "description": f"Extracted professional experience and skills from {filename}.",
+            "verification_strength": verif_strength,
+            "base_score": base_score,
             "recency_months": 2.0,
             "skill_events": skill_events
         }

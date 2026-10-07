@@ -267,6 +267,43 @@ class CandidateDB:
         conn.close()
         return rows
 
+    def remove_source(self, candidate_id: str, source_type: str) -> int:
+        """Removes all sources of a given type (and cascading evidence/events) for a candidate."""
+        conn = get_connection(self.db_path)
+        with conn:
+            cur = conn.execute(
+                "DELETE FROM candidate_sources WHERE candidate_id = ? AND source_type = ?",
+                (candidate_id, source_type.upper())
+            )
+            count = cur.rowcount
+            # Also clean up derived skills if all sources are gone
+            cur2 = conn.execute("SELECT COUNT(*) as cnt FROM candidate_sources WHERE candidate_id = ?", (candidate_id,))
+            if cur2.fetchone()["cnt"] == 0:
+                conn.execute("DELETE FROM candidate_skills WHERE candidate_id = ?", (candidate_id,))
+        conn.close()
+        return count
+
+    def remove_evidence(self, candidate_id: str, evidence_id: str) -> int:
+        """Removes a specific evidence record (and cascading events)."""
+        conn = get_connection(self.db_path)
+        with conn:
+            cur = conn.execute(
+                "DELETE FROM candidate_evidence WHERE candidate_id = ? AND evidence_id = ?",
+                (candidate_id, evidence_id)
+            )
+            count = cur.rowcount
+        conn.close()
+        return count
+
+    def clear_candidate_evidence(self, candidate_id: str):
+        """Completely purges all sources, evidence, skill events, and derived skills for a candidate."""
+        conn = get_connection(self.db_path)
+        with conn:
+            conn.execute("DELETE FROM candidate_sources WHERE candidate_id = ?", (candidate_id,))
+            conn.execute("DELETE FROM candidate_evidence WHERE candidate_id = ?", (candidate_id,))
+            conn.execute("DELETE FROM candidate_skills WHERE candidate_id = ?", (candidate_id,))
+        conn.close()
+
     def save_derived_skills(
         self,
         candidate_id: str,

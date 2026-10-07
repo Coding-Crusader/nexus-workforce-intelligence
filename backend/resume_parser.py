@@ -104,19 +104,25 @@ def extract_capabilities_from_resume(
             count += matches
 
         skill_counts[canonical_key] = count
-        # Score heuristic: 0 count -> 0.20 baseline, 1-2 count -> 0.50-0.65, 3+ count -> 0.75-0.90
+        # Strict Evidence Heuristic: Unverified resume text mentions
+        # 0 count -> 0.20 unverified baseline
+        # 1 count -> 0.35 foundational mention
+        # 2 counts -> 0.48 developing knowledge
+        # 3 counts -> 0.60 documented competency
+        # 4-5 counts -> 0.72 recurring project implementation
+        # 6+ counts -> 0.82 deep professional specialization
         if count == 0:
             score = 0.20
         elif count == 1:
-            score = 0.50
+            score = 0.35
         elif count == 2:
-            score = 0.65
+            score = 0.48
         elif count == 3:
-            score = 0.75
+            score = 0.60
         elif count <= 5:
-            score = 0.85
+            score = 0.72
         else:
-            score = 0.92
+            score = 0.82
         detected_skills[canonical_key] = score
 
     exp_years = parse_experience_from_text(text)

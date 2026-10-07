@@ -25,7 +25,11 @@
     "scipy",
     "pyspark",
     "django",
-    "flask"
+    "flask",
+    "c++",
+    "c programming",
+    "c language",
+    "javascript"
   ],
   "sql_database": [
     "sql",
@@ -68,7 +72,9 @@
     "excel",
     "advanced excel",
     "google analytics",
-    "bi"
+    "bi",
+    "presentation",
+    "presentation skills"
   ],
   "math_statistics": [
     "statistics",
@@ -109,7 +115,9 @@
     "stakeholder management",
     "functional consulting",
     "agile",
-    "scrum"
+    "scrum",
+    "project management",
+    "project manager"
   ],
   "cloud_deployment_mlops": [
     "aws",

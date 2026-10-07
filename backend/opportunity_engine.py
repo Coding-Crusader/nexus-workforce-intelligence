@@ -88,20 +88,34 @@ class OpportunityEngine:
         secondary_skills = {k: v for k, v in reqs.items() if 0.15 <= v < 0.50}
 
         # 1. Core skills coverage
+        # In NEXUS, unverified baseline is 0.20. Skills at or below 0.20 represent zero demonstrated evidence.
+        # We calculate verified proficiency relative to market requirements above baseline:
         if core_skills:
-            core_cov = sum(v * min(capabilities.get(k, 0.0) / v, 1.0) for k, v in core_skills.items()) / sum(core_skills.values())
+            core_cov_items = []
+            for k, v in core_skills.items():
+                cand_c = capabilities.get(k, 0.20)
+                cand_dem = max(0.0, cand_c - 0.20) / 0.80
+                req_norm = max(0.15, v - 0.20) / 0.80
+                core_cov_items.append(v * min(1.0, cand_dem / req_norm))
+            core_cov = sum(core_cov_items) / sum(core_skills.values())
         else:
             core_cov = 1.0
 
         # 2. Secondary skills coverage
         if secondary_skills:
-            sec_cov = sum(v * min(capabilities.get(k, 0.0) / v, 1.0) for k, v in secondary_skills.items()) / sum(secondary_skills.values())
+            sec_cov_items = []
+            for k, v in secondary_skills.items():
+                cand_c = capabilities.get(k, 0.20)
+                cand_dem = max(0.0, cand_c - 0.20) / 0.80
+                req_norm = max(0.10, v - 0.20) / 0.80
+                sec_cov_items.append(v * min(1.0, cand_dem / req_norm))
+            sec_cov = sum(sec_cov_items) / sum(secondary_skills.values())
         else:
             sec_cov = core_cov
 
-        # 3. Experience requirement alignment
+        # 3. Experience requirement alignment (strict; no artificial floor for freshers)
         req_exp = float(self.benchmarks.loc[role_name, "min_experience_years"]) if role_name in self.benchmarks.index else 2.0
-        exp_cov = min(1.0, experience_years / max(req_exp, 0.5))
+        exp_cov = min(1.0, max(0.0, experience_years) / max(req_exp, 1.0))
 
         w_core = self.weights.get("core_skill_match", 0.55)
         w_sec = self.weights.get("secondary_skill_match", 0.25)
@@ -109,10 +123,19 @@ class OpportunityEngine:
 
         raw_score = (w_core * core_cov) + (w_sec * sec_cov) + (w_exp * exp_cov)
 
-        # Deficit penalty if candidate has critical gap in dominant core competency (req >= 0.70 & cap < 0.40)
+        # Seniority deficit penalty: If role demands high experience (>= 3 yrs) and candidate has < 1.5 yrs
+        if req_exp >= 3.0 and experience_years < 1.5:
+            sen_penalty = min(0.25, (req_exp - experience_years) * 0.05)
+            raw_score = max(0.0, raw_score - sen_penalty)
+
+        # Core competency deficit penalty: missing or unverified primary requirements heavily penalize fit
         for k, v in core_skills.items():
-            if v >= 0.70 and capabilities.get(k, 0.0) < 0.40:
-                penalty = (0.40 - capabilities.get(k, 0.0)) * 0.45
+            cand_c = capabilities.get(k, 0.20)
+            if cand_c <= 0.25:
+                penalty = v * 0.10
+                raw_score = max(0.0, raw_score - penalty)
+            elif cand_c < v * 0.60:
+                penalty = (v - cand_c) * 0.15
                 raw_score = max(0.0, raw_score - penalty)
 
         score = round(float(raw_score), 3)

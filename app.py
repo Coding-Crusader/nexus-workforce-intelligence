@@ -296,7 +296,7 @@ _init_loader_placeholder.markdown("""
 """, unsafe_allow_html=True)
 
 SYSTEM = initialize_nexus_system()
-DB: CandidateDB = SYSTEM["db"]
+DB: CandidateDB = CandidateDB()
 _init_loader_placeholder.empty()
 
 # ----------------------------------------------------
@@ -308,7 +308,7 @@ def _init_state():
         "user_email": "",
         "user_name": "",
         "user_title": "Data Practitioner",
-        "user_exp": 2.0,
+        "user_exp": 0.0,
         "candidate_id": "",
         "candidate_info": {},
         "derived_capabilities": {},    # EvidenceScorer keys — for display in Step 2
@@ -319,6 +319,7 @@ def _init_state():
         "selected_gh_user": "",
         "selected_lc_user": "",
         "fetch_feedback": [],
+        "opt_in_discoverable": True,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -338,6 +339,19 @@ SKILL_DISPLAY_NAMES = {
     "data_engineering": "Data Engineering & Pipelines",
     "mlops_production": "MLOps & Production Deployment"
 }
+
+def format_experience_label(exp_val: float) -> str:
+    total_months = int(round(float(exp_val) * 12))
+    yrs = total_months // 12
+    mos = total_months % 12
+    if yrs == 0 and mos == 0:
+        return "0 yrs (Fresher / Student)"
+    parts = []
+    if yrs > 0:
+        parts.append(f"{yrs} yr{'s' if yrs != 1 else ''}")
+    if mos > 0:
+        parts.append(f"{mos} mo{'s' if mos != 1 else ''}")
+    return " ".join(parts)
 
 # -----------------------------------------------------------------------
 # Key translation: EvidenceScorer canonical → OpportunityEngine role keys
@@ -555,8 +569,8 @@ def reset_to_new_profile():
 
     # 2. Clear all Streamlit widget state keys so all input fields are completely blank
     widget_keys = [
-        "step1_email", "step1_name", "step1_exp",
-        "exact_gh_user", "exact_lc_user", "step1_resume",
+        "step1_email", "step1_name", "step1_exp", "step1_exp_years", "step1_exp_months",
+        "exact_gh_user", "exact_lc_user", "step1_resume", "step1_fresh_audit",
         "step5_target_role_select", "step5_inv_select"
     ]
     for wk in widget_keys:
@@ -580,11 +594,12 @@ with st.sidebar:
     # Active Candidate Status Card
     if st.session_state.user_email:
         name_show = st.session_state.user_name or st.session_state.user_email.split('@')[0].title()
+        exp_show = format_experience_label(st.session_state.user_exp)
         st.markdown(f"""
         <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
             <div style="font-weight: 800; color: #0f172a; font-size: 0.95rem;">👤 {name_show}</div>
             <div style="font-size: 0.78rem; color: #0284c7; word-break: break-all;">✉️ {st.session_state.user_email}</div>
-            <div style="font-size: 0.75rem; color: #64748b; margin-top: 3px;">💼 Exp: <strong>{st.session_state.user_exp:.1f} yrs</strong></div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-top: 3px;">💼 Exp: <strong>{exp_show}</strong></div>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -691,7 +706,27 @@ if st.session_state.current_step == 1:
         st.markdown("#### 1. Enter Your Details")
         email_val = st.text_input("Email address (required):", value=st.session_state.user_email, placeholder="e.g. aryan.rai@gmail.com", key="step1_email")
         name_val = st.text_input("Full name (optional):", value=st.session_state.user_name, placeholder="e.g. Aryan Rai", key="step1_name")
-        exp_val = st.number_input("Years of experience:", min_value=0.0, max_value=25.0, value=float(st.session_state.user_exp), step=0.5, key="step1_exp")
+
+        # Experience Gradient: Years & Months (Defaults to 0 yrs, 0 mos)
+        st.markdown("<label style='font-size: 0.88rem; font-weight: 600; color: #334155; margin-bottom: 2px; display: block;'>Work Experience:</label>", unsafe_allow_html=True)
+        col_exp_y, col_exp_m = st.columns(2)
+        cur_exp = float(st.session_state.get("user_exp", 0.0))
+        cur_yrs = int(cur_exp)
+        cur_mos = int(round((cur_exp - cur_yrs) * 12))
+        if cur_mos >= 12:
+            cur_yrs += 1
+            cur_mos = 0
+
+        with col_exp_y:
+            exp_years = st.number_input("Years:", min_value=0, max_value=30, value=cur_yrs, step=1, key="step1_exp_years")
+        with col_exp_m:
+            exp_months = st.number_input("Months:", min_value=0, max_value=11, value=cur_mos, step=1, key="step1_exp_months")
+
+        exp_val = round(float(exp_years) + (float(exp_months) / 12.0), 2)
+        st.session_state.user_exp = exp_val
+
+        exp_badge = format_experience_label(exp_val)
+        st.caption(f"⏱️ Total Experience: **{exp_badge}** ({exp_val:.2f} yrs)")
 
         col_demo_btn, col_new_btn = st.columns(2)
         with col_demo_btn:
@@ -713,78 +748,31 @@ if st.session_state.current_step == 1:
                 st.rerun()
 
     with col_e2:
-        st.markdown("#### 2. Enter Public Profiles to Audit")
+        st.markdown("#### 2. Enter Public Profiles to Audit (Optional)")
         st.caption("Enter your exact public handles to pull verified contributions and metrics directly:")
 
         gh_input_user = st.text_input(
-            "GitHub Username to audit:",
-            value=st.session_state.selected_gh_user or (email_val.split("@")[0] if "@" in email_val else ""),
-            placeholder="e.g. AryanRai or octocat",
+            "GitHub Username to audit (optional):",
+            value=st.session_state.selected_gh_user,
+            placeholder="e.g. AryanRai or octocat (leave blank if none)",
             key="exact_gh_user"
         )
+        st.session_state.selected_gh_user = gh_input_user.strip()
 
         lc_input_user = st.text_input(
-            "LeetCode Username to audit:",
-            value=st.session_state.selected_lc_user or (email_val.split("@")[0] if "@" in email_val else ""),
-            placeholder="e.g. AryanRai",
+            "LeetCode Username to audit (optional):",
+            value=st.session_state.selected_lc_user,
+            placeholder="e.g. AryanRai (leave blank if none)",
             key="exact_lc_user"
         )
+        st.session_state.selected_lc_user = lc_input_user.strip()
 
-        if st.button("🚀 Fetch Authentic Data & Proceed to Step 2 →", type="primary", use_container_width=True):
-            clean_email = email_val.strip().lower()
-            if not clean_email or "@" not in clean_email:
-                st.error("Please enter your email on the left first.")
-            else:
-                st.session_state.user_email = clean_email
-                st.session_state.user_name = name_val.strip() or clean_email.split("@")[0].title()
-                st.session_state.user_exp = exp_val
-
-                cand = DB.get_or_create_candidate(clean_email, name=st.session_state.user_name, title="Data Practitioner", years_exp=exp_val)
-                st.session_state.candidate_id = cand["candidate_id"]
-                st.session_state.candidate_info = cand
-
-                feedback = []
-
-                # GitHub Fetch
-                target_gh = gh_input_user.strip()
-                if target_gh:
-                    with st.spinner(f"Auditing GitHub @{target_gh}..."):
-                        gh_conn = GitHubConnector()
-                        evi_gh = gh_conn.fetch_public_profile(target_gh)
-                        src_id = DB.register_source(cand["candidate_id"], "GITHUB", f"github.com/{target_gh}")
-                        DB.add_evidence(
-                            cand["candidate_id"], src_id, evi_gh["evidence_type"],
-                            evi_gh["title"], evi_gh["description"], evi_gh["verification_strength"],
-                            evi_gh["base_score"], evi_gh["recency_months"], evi_gh["skill_events"]
-                        )
-                        event_cnt = len(evi_gh["skill_events"])
-                        if event_cnt > 0:
-                            feedback.append(f"✓ GitHub @{target_gh}: Audited public repos -> {event_cnt} verified skill signals.")
-                        else:
-                            feedback.append(f"ℹ️ GitHub @{target_gh}: 0 public repos found. Zero filler added.")
-
-                # LeetCode Fetch
-                target_lc = lc_input_user.strip()
-                if target_lc:
-                    with st.spinner(f"Querying LeetCode for @{target_lc}..."):
-                        lc_conn = LeetCodeConnector()
-                        evi_lc = lc_conn.fetch_public_stats(target_lc)
-                        raw = evi_lc.get("raw_counts", {})
-                        if raw.get("All", 0) > 0:
-                            src_id = DB.register_source(cand["candidate_id"], "SKILL_PLATFORM", f"leetcode.com/{target_lc}")
-                            DB.add_evidence(
-                                cand["candidate_id"], src_id, evi_lc["evidence_type"],
-                                evi_lc["title"], evi_lc["description"], evi_lc["verification_strength"],
-                                evi_lc["base_score"], evi_lc["recency_months"], evi_lc["skill_events"]
-                            )
-                            feedback.append(f"✓ LeetCode @{target_lc}: {raw.get('All', 0)} accepted problems ({raw.get('Hard', 0)} Hard).")
-                        else:
-                            feedback.append(f"ℹ️ LeetCode @{target_lc}: 0 accepted submissions found.")
-
-                recalculate_profile(cand["candidate_id"])
-                st.session_state.fetch_feedback = feedback
-                st.session_state.current_step = 2
-                st.rerun()
+        st.markdown("""
+        <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 0.82rem; color: #475569; line-height: 1.45;">
+            💡 <strong>Unified Ingestion:</strong> Enter your handles above and any optional evidence below (Resume, Coursework, or Self-Assessment).
+            Then click the single <strong>Proceed to Step 2</strong> button at the bottom to process all inputs together.
+        </div>
+        """, unsafe_allow_html=True)
 
     if st.session_state.fetch_feedback:
         st.markdown("---")
@@ -793,31 +781,83 @@ if st.session_state.current_step == 1:
             st.write(fb)
 
     st.markdown("---")
-    st.markdown("#### 3. Additional Evidence Sources (Optional)")
-    tab_res, tab_manual, tab_ledger = st.tabs(["📄 Upload Resume", "✍️ Self-Declared Skills", "🗄️ Evidence Ledger"])
+    st.markdown("#### 3. Additional Evidence Sources & Cold-Start Seeding (Optional)")
+    tab_res, tab_coursework, tab_manual, tab_ledger = st.tabs([
+        "📄 Upload Resume",
+        "🎓 Coursework & Syllabus (Cold Start)",
+        "✍️ Self-Declared Skills",
+        "🗄️ Evidence Ledger"
+    ])
 
     with tab_res:
         uploaded_resume = st.file_uploader("Upload resume (PDF / DOCX):", type=["pdf", "docx"], key="step1_resume")
-        if uploaded_resume and st.button("Extract Resume Evidence & Proceed →", key="btn_step1_resume"):
-            if not st.session_state.candidate_id:
-                clean_email = email_val.strip().lower() or "candidate@local.internal"
-                cand = DB.get_or_create_candidate(clean_email, name=name_val.strip() or "Candidate", title="Data Practitioner", years_exp=exp_val)
-                st.session_state.candidate_id = cand["candidate_id"]
-                st.session_state.candidate_info = cand
-                st.session_state.user_email = clean_email
-            with st.spinner("Extracting verified skills from resume..."):
-                r_conn = ResumeConnector()
-                resume_bytes = uploaded_resume.getvalue() if hasattr(uploaded_resume, "getvalue") else uploaded_resume.read()
-                evi = r_conn.process(filename=uploaded_resume.name, file_bytes=resume_bytes)
-                src_id = DB.register_source(st.session_state.candidate_id, "RESUME", uploaded_resume.name)
+        if uploaded_resume:
+            st.info(f"📄 Resume **{uploaded_resume.name}** selected. It will be audited and ingested when you click the button below.")
+
+    with tab_coursework:
+        st.markdown("##### 🎓 Cold Start: University Syllabi, Coursework & Academic Labs")
+        st.caption("No public coding portfolio or industry experience yet? Seed your initial verified capability baseline directly from completed university coursework, engineering labs, and academic assessments (Build for Bharat Slide 01 & 06).")
+
+        col_cw1, col_cw2 = st.columns(2)
+        with col_cw1:
+            cw_institution = st.text_input("University / Institution Name:", placeholder="e.g. Indian Institute of Technology / NIT / Anna University", key="cw_inst_name")
+            cw_degree = st.selectbox("Degree / Program Track:", ["B.Tech / B.E. Computer Science & IT", "B.Tech / B.E. Electrical & Electronics", "B.Sc / M.Sc Data Science & Statistics", "BCA / MCA Information Technology", "Other STEM Undergraduate"], key="cw_degree_prog")
+            cw_perf = st.selectbox("Academic Performance / Grade Standing:", [
+                "Distinction / A Grade (80%+ / 8.5+ CGPA) — Advanced Aptitude",
+                "First Class / B Grade (65–79% / 7.0+ CGPA) — Proficient Aptitude",
+                "Pass / Second Class (50–64%) — Foundational Aptitude"
+            ], key="cw_grade_perf")
+
+        with col_cw2:
+            st.markdown("**Select Completed Courses & Labs:**")
+            cw_sel_dsa = st.checkbox("Data Structures & Algorithms (Python / C++)", value=True, key="cw_dsa")
+            cw_sel_dbms = st.checkbox("Database Management Systems (RDBMS & SQL Labs)", value=True, key="cw_dbms")
+            cw_sel_stats = st.checkbox("Probability, Linear Algebra & Applied Statistics", value=True, key="cw_stats")
+            cw_sel_ml = st.checkbox("Machine Learning & Applied Modeling Lab", value=False, key="cw_ml")
+            cw_sel_bi = st.checkbox("Data Visualization & Business Analytics", value=False, key="cw_bi")
+            cw_sel_cloud = st.checkbox("Cloud Computing & Distributed Systems", value=False, key="cw_cloud")
+            cw_sel_nlp = st.checkbox("Deep Learning & Natural Language Processing", value=False, key="cw_nlp")
+
+        if st.button("🌱 Register Coursework Signals", key="btn_seed_coursework"):
+            clean_email = email_val.strip().lower() or "student@university.ac.in"
+            cand = DB.get_or_create_candidate(clean_email, name=name_val.strip() or "Student Scholar", title=cw_degree, years_exp=exp_val)
+            st.session_state.candidate_id = cand["candidate_id"]
+            st.session_state.candidate_info = cand
+            st.session_state.user_email = clean_email
+            st.session_state.user_title = cw_degree
+
+            base_score = 0.85 if "Distinction" in cw_perf else (0.72 if "First Class" in cw_perf else 0.60)
+            cw_events = []
+            if cw_sel_dsa:
+                cw_events.append({"skill": "python", "topic": "Data Structures, Algorithms & Problem Solving", "score": base_score, "difficulty": "MEDIUM", "volume": 1, "recency": 3.0})
+            if cw_sel_dbms:
+                cw_events.append({"skill": "sql", "topic": "Relational Databases, Normalization & SQL Queries", "score": base_score, "difficulty": "MEDIUM", "volume": 1, "recency": 3.0})
+            if cw_sel_stats:
+                cw_events.append({"skill": "statistics_math", "topic": "Linear Algebra, Probability & Applied Statistical Tests", "score": round(base_score * 0.95, 2), "difficulty": "MEDIUM", "volume": 1, "recency": 3.0})
+            if cw_sel_ml:
+                cw_events.append({"skill": "machine_learning", "topic": "Supervised/Unsupervised Learning & Model Evaluation", "score": round(base_score * 0.90, 2), "difficulty": "MEDIUM", "volume": 1, "recency": 3.0})
+            if cw_sel_bi:
+                cw_events.append({"skill": "business_intelligence", "topic": "Business Intelligence & Metric Reporting", "score": round(base_score * 0.85, 2), "difficulty": "EASY", "volume": 1, "recency": 3.0})
+                cw_events.append({"skill": "data_storytelling", "topic": "Exploratory Data Analysis & Presentation", "score": round(base_score * 0.85, 2), "difficulty": "EASY", "volume": 1, "recency": 3.0})
+            if cw_sel_cloud:
+                cw_events.append({"skill": "big_data_cloud", "topic": "Distributed Cloud Systems & Virtualization", "score": round(base_score * 0.80, 2), "difficulty": "MEDIUM", "volume": 1, "recency": 3.0})
+            if cw_sel_nlp:
+                cw_events.append({"skill": "deep_learning_nlp", "topic": "Neural Networks, Transformers & NLP Pipelines", "score": round(base_score * 0.80, 2), "difficulty": "HARD", "volume": 1, "recency": 3.0})
+
+            if not cw_events:
+                st.warning("Please check at least one completed university course.")
+            else:
+                inst_label = cw_institution.strip() or "University Syllabus"
+                src_id = DB.register_source(cand["candidate_id"], "COURSEWORK", f"{inst_label} — {cw_degree}")
                 DB.add_evidence(
-                    st.session_state.candidate_id, src_id, evi["evidence_type"],
-                    evi["title"], evi["description"], evi["verification_strength"],
-                    evi["base_score"], evi["recency_months"], evi["skill_events"]
+                    cand["candidate_id"], src_id, "ACADEMIC_SYLLABUS_RECORD",
+                    f"University Coursework: {inst_label}",
+                    f"Accredited coursework modules in {cw_degree} with standing: {cw_perf}.",
+                    "MEDIUM",
+                    base_score, 3.0, cw_events
                 )
-                recalculate_profile(st.session_state.candidate_id)
-            st.session_state.current_step = 2
-            st.rerun()
+                recalculate_profile(cand["candidate_id"])
+                st.success(f"✓ Successfully registered {len(cw_events)} capability signals from {inst_label} coursework! Click the button below to proceed.")
 
     with tab_manual:
         st.caption("Rate yourself on skills not captured in external profiles:")
@@ -839,13 +879,12 @@ if st.session_state.current_step == 1:
                 if lvl > 0.25 and st.session_state.candidate_id:
                     st.session_state.derived_capabilities[sk] = lvl
 
-        if st.button("Save Skills & Proceed to Step 2 →", key="btn_save_manual_step1"):
-            if not st.session_state.candidate_id:
-                clean_email = email_val.strip().lower() or "candidate@local.internal"
-                cand = DB.get_or_create_candidate(clean_email, name=name_val.strip() or "Candidate", title="Data Practitioner", years_exp=exp_val)
-                st.session_state.candidate_id = cand["candidate_id"]
-                st.session_state.candidate_info = cand
-                st.session_state.user_email = clean_email
+        if st.button("💾 Save Declared Skills", key="btn_save_manual_step1"):
+            clean_email = email_val.strip().lower() or "candidate@local.internal"
+            cand = DB.get_or_create_candidate(clean_email, name=name_val.strip() or "Candidate", title="Data Practitioner", years_exp=exp_val)
+            st.session_state.candidate_id = cand["candidate_id"]
+            st.session_state.candidate_info = cand
+            st.session_state.user_email = clean_email
             src_id = DB.register_source(st.session_state.candidate_id, "SELF_DECLARED", "Self_Assessment")
             events = [
                 {"skill": k, "topic": "Self Assessment", "score": v, "difficulty": "EASY", "volume": 1, "recency": 1.0}
@@ -856,8 +895,7 @@ if st.session_state.current_step == 1:
                 "Self-Assessment", "User-declared proficiency.", "WEAK", 0.60, 1.0, events
             )
             recalculate_profile(st.session_state.candidate_id)
-            st.session_state.current_step = 2
-            st.rerun()
+            st.success("✓ Saved self-declared skills into Evidence Ledger! Click the button below to proceed.")
 
     with tab_ledger:
         if st.session_state.candidate_id:
@@ -867,24 +905,112 @@ if st.session_state.current_step == 1:
                     "title": "Evidence Title", "source_type": "Source Type", "verification_strength": "Strength",
                     "recency_months": "Recency (Mo)", "timestamp": "Timestamp"
                 }), width="stretch")
+                col_cl1, col_cl2 = st.columns([6, 4])
+                with col_cl2:
+                    if st.button("🧹 Clear All Stored Evidence for this Profile", key="btn_clear_ledger"):
+                        DB.clear_candidate_evidence(st.session_state.candidate_id)
+                        recalculate_profile(st.session_state.candidate_id)
+                        st.success("✓ Evidence ledger cleared successfully.")
+                        st.rerun()
             else:
                 st.info("No evidence registered yet.")
         else:
             st.info("Enter your email above to inspect your evidence ledger.")
 
     st.markdown("---")
-    col_p1, col_p2 = st.columns([7, 3])
+    col_p1, col_p2 = st.columns([5, 5])
+    with col_p1:
+        fresh_audit = st.checkbox(
+            "🧹 Fresh Profile Audit (evaluate only newly entered inputs)",
+            value=True,
+            key="step1_fresh_audit",
+            help="When checked, any historical evidence cached for this email address is cleared before ingesting, ensuring capability scores strictly match only the handles and files you provided right now."
+        )
     with col_p2:
-        if st.button("Proceed to Step 2: Capability Profile →", type="primary", use_container_width=True, key="btn_next_step1_main"):
-            if not st.session_state.candidate_id and email_val.strip():
-                clean_email = email_val.strip().lower()
-                cand = DB.get_or_create_candidate(clean_email, name=name_val.strip() or clean_email.split("@")[0].title(), title="Data Practitioner", years_exp=exp_val)
+        if st.button("🚀 Ingest Evidence & Proceed to Step 2: Capability Profile →", type="primary", use_container_width=True, key="btn_next_step1_main"):
+            clean_email = email_val.strip().lower()
+            if not clean_email or "@" not in clean_email:
+                st.error("Please enter a valid email address in Section 1 before proceeding.")
+            else:
+                st.session_state.user_email = clean_email
+                st.session_state.user_name = name_val.strip()
+                st.session_state.user_exp = exp_val
+
+                cand = DB.get_or_create_candidate(clean_email, name=st.session_state.user_name or "Data Practitioner", title="Data Practitioner", years_exp=exp_val)
                 st.session_state.candidate_id = cand["candidate_id"]
                 st.session_state.candidate_info = cand
-                st.session_state.user_email = clean_email
+
+                # If Fresh Audit is selected, purge prior historical sources for clean evaluation
+                if fresh_audit:
+                    DB.clear_candidate_evidence(cand["candidate_id"])
+                else:
+                    # Replace per-source evidence if newly provided so duplicate sources don't accumulate
+                    target_gh_chk = gh_input_user.strip()
+                    target_lc_chk = lc_input_user.strip()
+                    if target_gh_chk:
+                        DB.remove_source(cand["candidate_id"], "GITHUB")
+                    if target_lc_chk:
+                        DB.remove_source(cand["candidate_id"], "SKILL_PLATFORM")
+                    if uploaded_resume is not None:
+                        DB.remove_source(cand["candidate_id"], "RESUME")
+
+                feedback = []
+
+                # GitHub Fetch if provided
+                target_gh = gh_input_user.strip()
+                if target_gh:
+                    with st.spinner(f"Auditing GitHub @{target_gh}..."):
+                        gh_conn = GitHubConnector()
+                        evi_gh = gh_conn.fetch_public_profile(target_gh)
+                        src_id = DB.register_source(cand["candidate_id"], "GITHUB", f"github.com/{target_gh}")
+                        DB.add_evidence(
+                            cand["candidate_id"], src_id, evi_gh["evidence_type"],
+                            evi_gh["title"], evi_gh["description"], evi_gh["verification_strength"],
+                            evi_gh["base_score"], evi_gh["recency_months"], evi_gh["skill_events"]
+                        )
+                        event_cnt = len(evi_gh["skill_events"])
+                        if event_cnt > 0:
+                            feedback.append(f"✓ GitHub @{target_gh}: Audited public repos -> {event_cnt} verified skill signals.")
+                        else:
+                            feedback.append(f"ℹ️ GitHub @{target_gh}: 0 public repos found.")
+
+                # LeetCode Fetch if provided
+                target_lc = lc_input_user.strip()
+                if target_lc:
+                    with st.spinner(f"Querying LeetCode for @{target_lc}..."):
+                        lc_conn = LeetCodeConnector()
+                        evi_lc = lc_conn.fetch_public_stats(target_lc)
+                        raw = evi_lc.get("raw_counts", {})
+                        if raw.get("All", 0) > 0:
+                            src_id = DB.register_source(cand["candidate_id"], "SKILL_PLATFORM", f"leetcode.com/{target_lc}")
+                            DB.add_evidence(
+                                cand["candidate_id"], src_id, evi_lc["evidence_type"],
+                                evi_lc["title"], evi_lc["description"], evi_lc["verification_strength"],
+                                evi_lc["base_score"], evi_lc["recency_months"], evi_lc["skill_events"]
+                            )
+                            feedback.append(f"✓ LeetCode @{target_lc}: {raw.get('All', 0)} accepted problems ({raw.get('Hard', 0)} Hard).")
+                        else:
+                            feedback.append(f"ℹ️ LeetCode @{target_lc}: 0 accepted submissions found.")
+
+                # Resume Processing if uploaded
+                if uploaded_resume is not None:
+                    with st.spinner(f"Extracting skills from resume {uploaded_resume.name}..."):
+                        r_conn = ResumeConnector()
+                        resume_bytes = uploaded_resume.getvalue() if hasattr(uploaded_resume, "getvalue") else uploaded_resume.read()
+                        evi = r_conn.process(filename=uploaded_resume.name, file_bytes=resume_bytes)
+                        src_id = DB.register_source(cand["candidate_id"], "RESUME", uploaded_resume.name)
+                        DB.add_evidence(
+                            cand["candidate_id"], src_id, evi["evidence_type"],
+                            evi["title"], evi["description"], evi["verification_strength"],
+                            evi["base_score"], evi["recency_months"], evi["skill_events"]
+                        )
+                        feedback.append(f"✓ Resume: Extracted verified skills from {uploaded_resume.name}.")
+
                 recalculate_profile(cand["candidate_id"])
-            st.session_state.current_step = 2
-            st.rerun()
+                if feedback:
+                    st.session_state.fetch_feedback = feedback
+                st.session_state.current_step = 2
+                st.rerun()
 
 
 # =====================================================================
@@ -951,6 +1077,36 @@ elif st.session_state.current_step == 2:
             width="stretch"
         )
 
+        with st.expander("🔬 Evidence Confidence & 18-Month Skill Half-Life Audit (Deck Slide 04)"):
+            st.markdown("""
+            #### How NEXUS Quantifies Capability Defensibility
+            Unlike conventional job platforms that treat all self-declared resume bullets equally, **NEXUS computes capability confidence through source verification tiers, recency decay, and multi-source cross-corroboration**.
+            """)
+
+            col_cf1, col_cf2 = st.columns(2)
+            with col_cf1:
+                st.markdown("""
+                ##### 1. Evidence Verification Hierarchy
+                | Evidence Tier | Verification Weight | Verified Artifact Examples |
+                |---|---|---|
+                | **STRONG (1.00)** | Full Verification | Production GitHub repos, verified client deliverables |
+                | **STRONG (1.00)** | Full Verification | Real-world competition pipelines, accepted PRs |
+                | **MEDIUM (0.85)** | High Credibility | Accredited university coursework, graded lab exams |
+                | **SUPPORTING (0.75)** | Moderate Signal | Industry certifications, verified MOOC credentials |
+                | **WEAK / SELF (0.50)** | Baseline Entry | Self-declared profile claims & informal interest |
+                """)
+
+            with col_cf2:
+                st.markdown("""
+                ##### 2. Mathematical Skill Half-Life Decay (18-Month)
+                Without ongoing active demonstration, technical skill confidence decays exponentially over an 18-month half-life:
+                $$Confidence(e) = BaseScore \\times Weight_{strength} \\times 2^{-\\frac{\\Delta t}{18\\text{ months}}}$$
+                
+                * **Recency Guarantee:** Skills demonstrated within the last 30 days retain ~98%+ confidence.
+                * **Stale Evidence Protection:** Inactive skills older than 36 months naturally decay to baseline, protecting against obsolete candidate claims.
+                * **Multi-Source Corroboration:** When 2+ independent sources (e.g. GitHub + Coursework) validate the same capability, a **+10% cross-validation bonus** is awarded.
+                """)
+
         st.markdown("---")
         col_b1, col_b2 = st.columns([3, 3])
         with col_b1:
@@ -976,7 +1132,7 @@ elif st.session_state.current_step == 3:
 
     caps = st.session_state.derived_capabilities          # display keys (Step 2 only)
     exp = float(st.session_state.user_exp)
-    effective_exp = max(exp, 0.5)                          # floor: treat 0-exp as entry-level grad
+    effective_exp = exp                                   # Exact user experience (0.0 for freshers)
 
     if not caps and st.session_state.candidate_id:
         recalculate_profile(st.session_state.candidate_id)
@@ -1019,7 +1175,22 @@ elif st.session_state.current_step == 3:
             # role_profiles use engine_cap keys (sql_database, math_statistics etc.) — use engine_caps for lookup
             eng_display = {k: k.replace('_', ' ').title() for k in engine_caps}
             strengths = [eng_display.get(k, k.replace('_', ' ').title()) for k, w in reqs.items() if w >= 0.25 and engine_caps.get(k, 0.0) >= 0.55]
-            missing = [eng_display.get(k, k.replace('_', ' ').title()) for k, w in reqs.items() if w >= 0.25 and engine_caps.get(k, 0.0) < 0.50]
+            developing = [eng_display.get(k, k.replace('_', ' ').title()) for k, w in reqs.items() if w >= 0.25 and 0.35 <= engine_caps.get(k, 0.0) < 0.55]
+            missing = [eng_display.get(k, k.replace('_', ' ').title()) for k, w in reqs.items() if w >= 0.25 and engine_caps.get(k, 0.0) < 0.35]
+
+            if strengths:
+                strengths_label = ", ".join(strengths)
+            elif developing:
+                strengths_label = "Developing: " + ", ".join(developing)
+            else:
+                strengths_label = "⚠️ No verified competencies meeting market threshold yet"
+
+            if missing:
+                missing_label = ", ".join(missing)
+            elif not strengths and not developing:
+                missing_label = "All core domain competencies require evidence"
+            else:
+                missing_label = "No major gaps"
 
             st.markdown(f"""
             <div class="opp-card">
@@ -1039,11 +1210,11 @@ elif st.session_state.current_step == 3:
                 <div class="opp-skills-row">
                     <div class="opp-skills-col">
                         <div class="opp-skills-label strengths">✓ What Fits Well:</div>
-                        <div>{", ".join(strengths) if strengths else "Foundational aptitude"}</div>
+                        <div>{strengths_label}</div>
                     </div>
                     <div class="opp-skills-col">
                         <div class="opp-skills-label gaps">△ Key Skill Gaps:</div>
-                        <div>{", ".join(missing) if missing else "No major gaps"}</div>
+                        <div>{missing_label}</div>
                     </div>
                 </div>
             </div>
@@ -1093,7 +1264,7 @@ elif st.session_state.current_step == 4:
 
     caps = st.session_state.derived_capabilities
     exp = float(st.session_state.user_exp)
-    effective_exp = max(exp, 0.5)
+    effective_exp = exp
 
     if not caps and st.session_state.candidate_id:
         recalculate_profile(st.session_state.candidate_id)
@@ -1168,7 +1339,7 @@ elif st.session_state.current_step == 5:
 
     caps = st.session_state.derived_capabilities
     exp = float(st.session_state.user_exp)
-    effective_exp = max(exp, 0.5)
+    effective_exp = exp
 
     if not caps and st.session_state.candidate_id:
         recalculate_profile(st.session_state.candidate_id)
@@ -1253,6 +1424,35 @@ elif st.session_state.current_step == 5:
         """, unsafe_allow_html=True)
 
         st.plotly_chart(plot_three_futures_comparison(all_sim_results), width="stretch")
+
+        with st.expander("📊 3 Simulated Futures Comparative Matrix (The Counterfactual Layer — Slide 09)"):
+            st.markdown("""
+            #### Side-by-Side Transition Comparison Across All 3 Pathways
+            $$\\text{Opportunity Expansion}(I) = \\frac{|\\text{Roles after intervention}| - |\\text{Roles before}|}{|\\text{Roles before}|}$$
+            """)
+            matrix_data = []
+            for s in all_sim_results:
+                inv = s["intervention"]
+                code = inv.get("preset_code", "")
+                p_name = inv.get("short_name", inv.get("name", code))
+                g_roles = s["future_reachable_count"] - s["baseline_reachable_count"]
+                unlocked_str = ", ".join(s["newly_unlocked_roles"]) if s["newly_unlocked_roles"] else "Consolidation"
+
+                fut_caps = s["future_capabilities"]
+                fut_bns = SYSTEM["opp_engine"].detect_bottlenecks(fut_caps, effective_exp)
+                rem_bn = fut_bns.iloc[0]["display_name"] if not fut_bns.empty else "Balanced"
+
+                matrix_data.append({
+                    "Intervention Pathway": f"{code}: {p_name}",
+                    "Targeted Core Skills": ", ".join(k.replace('_', ' ').title() for k in inv.get("skills_affected", {}).keys()),
+                    "Reachable Roles": f"{s['baseline_reachable_count']} → {s['future_reachable_count']} (+{g_roles})",
+                    "Opportunity Expansion": f"+{s['opportunity_expansion_pct']:.1f}%",
+                    "Newly Unlocked Roles": unlocked_str,
+                    "Projected Avg Pay": f"₹{s['future_avg_salary']:.2f}L (+₹{s['salary_growth_lakhs']:.2f}L)",
+                    "Remaining Bottleneck": rem_bn
+                })
+
+            st.dataframe(pd.DataFrame(matrix_data), width="stretch")
 
         # ----------------------------------------------------
         # Expected Offer in Expected Role Calculator
@@ -1445,11 +1645,12 @@ elif st.session_state.current_step == 6:
     </div>
     """, unsafe_allow_html=True)
 
-    tab_a1, tab_a2, tab_a3, tab_a4 = st.tabs([
+    tab_a1, tab_a2, tab_a3, tab_a4, tab_a5 = st.tabs([
         "📊 The 4 Hackathon Datasets",
         "🗄️ SQLite Candidate Database",
         "🤖 Predictive Model Validation",
-        "📐 Mathematical Formulas"
+        "📐 Mathematical Formulas",
+        "🌐 Ecosystem Roadmap & Graph Architecture"
     ])
 
     with tab_a1:
@@ -1507,6 +1708,52 @@ elif st.session_state.current_step == 6:
         $$c' = \\tau(c, I) = \\max(c,\\ c + \\Delta_I)$$
         $$\\text{Opportunity Expansion} = \\frac{\\text{ReachableAfter} - \\text{ReachableBefore}}{\\max(\\text{ReachableBefore}, 1)}$$
         """)
+
+    with tab_a5:
+        st.markdown("""
+        ### 🌐 Build for Bharat 2.0 • Multi-Stakeholder Ecosystem Architecture
+        *Candidate-Only MVP Live Today · Recruiter, Organization, and Institutional Experiences on Active Roadmap (Deck Slides 02, 05, 07, 08)*
+        """)
+
+        col_ec1, col_ec2 = st.columns(2)
+        with col_ec1:
+            st.markdown("""
+            #### 🏛️ The 4 Stakeholder Pillars (Slide 05)
+            1. **👤 Candidate Experience (Live MVP Built First):**
+               * Solves the hardest decision loop first: *Evidence → Capability State → Intervention → Counterfactual State → Opportunity Expansion*.
+               * Allows engineering undergraduates and working practitioners to test *"If I learn X, what roles unlock?"*
+            2. **🏢 Recruiter Portal (Roadmap):**
+               * Replaces blind resume keyword matching with **verified evidence-backed transferable capability graphs**.
+               * Audits candidate repos and verified coursework directly to eliminate credential fraud.
+            3. **🏬 Organization Intelligence (Roadmap):**
+               * Internal capability shortage forecasting.
+               * **"Hire vs. Reskill" Cost/Time Optimization:** Models whether it is faster and cheaper to upskill existing analysts into data engineers or hire externally.
+            4. **🎓 Academic Institutions & Colleges (Roadmap):**
+               * **Curriculum ↔ Live Market Alignment:** Feeds live hiring signals back to university departments to modernize course syllabi.
+            """)
+
+        with col_ec2:
+            st.markdown("""
+            #### ⚙️ Graph-First Decision Layer & Defensibility (Slide 04 & 07)
+            ```
+            [Messy Candidate Evidence]
+                 ↓  NLP / Entity Parsing
+            [Person ↔ Evidence Graph Node]
+                 ↓  Verification Weight & 18-Mo Decay
+            [Quantified Capability State]
+                 ↓  Counterfactual Operator τ(c, I)
+            [Simulated Opportunity & Reachable Roles]
+            ```
+
+            * **Not an LLM Wrapper:** Deterministic mathematical operators, L2-regularized logistic regressions, and reproducible graph queries.
+            * **Market Platform Benchmark:**
+              * *LinkedIn / Naukri:* Discovery & keyword matching
+              * *National Career Service (NCS):* Job listings & career services
+              * *NEXUS:* Counterfactual transition simulation layer
+            * **Data Governance Guarantee (Slide 06):**
+              * 100% Consent-driven architecture.
+              * Strict PII minimization — profiles remain non-identifiable until mutual recruiter outreach opt-in.
+            """)
 
     st.markdown("---")
     col_b1, col_b2 = st.columns([3, 3])
